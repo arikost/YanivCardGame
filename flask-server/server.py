@@ -75,13 +75,9 @@ cards = [
     'black_joker'
 ]
 
-def get_card_from_pile():
-    pass
 
 def get_card_from_deck():
     global cards, pile
-    for c in last_cards_thrown: pile.append(c)
-    last_cards_thrown.clear()
     if len(cards) < 2:
         cards = pile[:]
         pile.clear()
@@ -99,7 +95,9 @@ def reset_player1_hand():
 
 @app.route("/get_card_deck")
 def get_card_deck():
-    return {"card": get_card_from_deck()}
+    card = get_card_from_deck()
+    player1.append(card)
+    return {"card": card}
 
 @app.route("/get_card_pile", methods=['POST'])
 def get_card_pile():
@@ -115,9 +113,9 @@ def get_card_deck():
     return {"card": card}
 
 
-@app.route("/get_last_cards_thrown")
-def get_last_cards_thrown():
-    return {"cards" : last_cards_thrown}
+@app.route("/get_pile")
+def get_pile():
+    return {"cards" : pile}
 
 
 @app.route("/get_legalty")
@@ -126,11 +124,12 @@ def get_legalty():
 
 @app.route("/check_legal_move", methods=["POST"])
 def check_legale_move():
-    global legalty
+    global legalty, last_cards_thrown
     request_data = json.loads(request.data)
-    data = list(request_data['cards']).sort() 
-    rank = int(str(request_data['cards'][0]).split('_')[0])
-    shape = str(request_data['cards'][0]).split('_')[2]
+    data = list(request_data['cards']) 
+    data.sort()
+    rank = int(str(data[0]).split('_')[0])
+    shape = str(data[0]).split('_')[2]
     legalty = "true"
     pair_or_straight = ""
     joker = 0
@@ -168,12 +167,43 @@ def check_legale_move():
                 legalty = 'false'
                 break
     if legalty == "true":
-        for c in last_cards_thrown: pile.append(c)
-        for c in data : player1.remove(c)
-        last_cards_thrown = data
+        print("player1 : ", player1)
+        print("last_cards_thrown : ", last_cards_thrown)
+        print("pile : ", pile)
+        print("data : ", data)
+        last_cards_thrown.clear()
+        for x in data : 
+            player1.remove(x)
+            last_cards_thrown.append(x)
+        for c in last_cards_thrown: 
+            pile.append(copy.copy(c))
+        
+        print("\n------------\nplayer1 : ", player1)
+        print("last_cards_thrown : ", last_cards_thrown)
+        print("pile : ", pile)
+        print("data : ", data)
+
     return legalty
+@app.route("/sim_player2")
+def sim_player2():
+    
+    return
+@app.route("/sim_player3")
+def sim_player3():
+    pass
+@app.route("/sim_player4")
+def sim_player4():
+    pass
 
 
+def simulate(player_hand:list):
+    desition = {'cards_to_throw' : [],
+                'pile_or_deck' : "",
+                'yaniv' : False
+    }
+
+
+    return desition
 
 def reset_game():
     for _ in range(5):

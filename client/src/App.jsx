@@ -93,17 +93,29 @@ render() {
           <PopUp trigger={this.state.showPopUp}>
             <div>
               <button className='close-btn' onClick={this.togglePop.bind(this)}>X</button>
-              {this.simulatesPlayers()}
+              {this.simulatesPlayers}
             </div>
           </PopUp>
           </React.Fragment>);
     }
 }
 simulatesPlayers(){
-  let text = "";
-  for(var i=1; i<5 ; i++ ){
-    fetch('')
-  }
+  let text = {};
+  // let cardsimages = [];
+  
+    fetch('/sim_player2').then(
+      res => res.json()
+    ).then(
+      (result) => {
+        text = result;
+        // text.push("player"+i+" playing...");
+        // text.push("player"+i+" throwe:");
+        
+        // text.push();
+        // text.push("player"+i+" playing...");
+      }
+    )
+  
   return(<h1>{text}</h1>)
 }
 disabledCenter1(){

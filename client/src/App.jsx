@@ -15,6 +15,8 @@ class App extends Component {
       lastThrown : [],
       cardBtnStyle : {backgroundColor:'antiquewhite', borderWidth: 0},
       showPopUp : false,
+      popupInnetText : "",
+      currentPlyer : 2,
     };
   }
 togglePop() {
@@ -49,7 +51,7 @@ componentDidMount() {
   }
 render() { 
    
-    const { error, isLoaded, items, pile, lastThrown } = this.state;
+    const { error, isLoaded, items, pile, lastThrown} = this.state;
     if (error) {
         return <div>Error: {error.message}</div>;
       } else if (!isLoaded) {
@@ -62,15 +64,15 @@ render() {
               onClick={this.getCardFromDeck.bind(this)} disabled={this.disabledCenter1()} >get card from deck</button>
               <div>
               {lastThrown.map((item, i) => 
-            <button className='btn btn-light m-1' key={i + 5} id={"pileCard"+i} onClick={() => this.pileCardSelcted(i)} 
+            <button className='btn btn-light m-1' key={i + 10} id={"pileCard"+i} onClick={() => this.pileCardSelcted(i)} 
             style={this.state.cardBtnStyle} disabled={this.disabledCenter2(i)}>
             <img  src={require('./images/'+item + '.png')} alt='' id={"lastThrowenCardImg"+i} width={90} height={120}></img>
             </button>
             )
             } </div>  
             <div>
-              {pile.map((item) =>
-                <img  src={require('./images/'+item + '.png')} alt='' id={"pilecardImg"} width={60} height={90} style={{margin: "2px"}}></img>
+              {pile.map((item, i) =>
+                <img  src={require('./images/'+item + '.png')} key={i + 20} alt='' id={"pilecardImg"} width={60} height={90} style={{margin: "2px"}}></img>
               
               )}
               </div>     
@@ -90,33 +92,45 @@ render() {
             </button>
             )}        
           </div>
-          <PopUp trigger={this.state.showPopUp}>
-            <div>
-              <button className='close-btn' onClick={this.togglePop.bind(this)}>X</button>
-              {this.simulatesPlayers}
-            </div>
-          </PopUp>
+          {
+            
+            <PopUp trigger={this.state.showPopUp} onChange={this.simulatesPlayers.bind(this)} id="popup">
+              <h3>{this.state.popupInnetText}</h3>
+
+            </PopUp>
+          }
           </React.Fragment>);
     }
 }
-simulatesPlayers(){
-  let text = {};
-  // let cardsimages = [];
-  
-    fetch('/sim_player2').then(
+simulatesPlayers(){ 
+    fetch('/sim_player'+this.state.currentPlyer).then(
       res => res.json()
     ).then(
       (result) => {
-        text = result;
-        // text.push("player"+i+" playing...");
-        // text.push("player"+i+" throwe:");
+        console.log("sim result", result);
+        this.updatePile();
+        if(result.yaniv){
+          console.log('yaniv');
+        }else{
+        this.setState({
+            lastThrown : [...result.cards_to_throw],
+        });
         
-        // text.push();
-        // text.push("player"+i+" playing...");
+      }
       }
     )
-  
-  return(<h1>{text}</h1>)
+    if(this.state.currentPlyer !== 4){
+      this.setState({ 
+        currentPlyer: this.state.currentPlyer +1,
+        popupInnetText : "Press next to simulate player"+this.state.currentPlyer
+      });
+    }else{
+      this.setState({ 
+        currentPlyer: 2,
+        popupInnetText : "Your Turn To Play"
+      });
+      this.togglePop();
+    }
 }
 disabledCenter1(){
   if(this.state.disabledCenterFlag){
@@ -153,7 +167,8 @@ pileCardSelcted(i){
   });
   this.resetSelectedCards();
   this.setState({
-    disabledCenterFlag : true
+    disabledCenterFlag : true,
+    popupInnetText : "Press next to simulate player"+this.state.currentPlyer
   });
   this.updatePile();
   this.togglePop();
@@ -178,7 +193,9 @@ getCardFromDeck(){
     }
   );
   this.setState({
-    disabledCenterFlag : true
+    disabledCenterFlag : true,
+    currentPlyer : 2,
+    popupInnetText : "Press next to simulate player"+this.state.currentPlyer
   });
   this.updatePile();
   this.togglePop();
@@ -189,6 +206,7 @@ updatePile(){
     res => res.json()
   ).then(
     (result) =>{
+      console.log("pile", result);
       this.setState({
         pile : [...result.cards]
       });

@@ -89,6 +89,20 @@ def get_card_from_deck():
 
 
 app = Flask(__name__)
+
+
+@app.route("/get_score")
+def get_score():
+    global player1, player2, player3, player4
+     
+    score = {
+        "player1" : get_sum(player1),
+        "player2" : get_sum(player2),
+        "player3" : get_sum(player3),
+        "player4" : get_sum(player4)
+        }
+    return score
+
 @app.route("/reset_player1_hand")
 def reset_player1_hand():
     player1.sort()
@@ -168,34 +182,44 @@ def check_legale_move():
             last_cards_thrown.append(x)
         for c in last_cards_thrown: 
             pile.append(copy.copy(c))
+        print("pile : -----", pile)
     return legalty
 @app.route("/sim_player2")
 def sim_player2():
     global last_cards_thrown, pile, player2
     dec = simulate(player2)
+    dec['cards_to_throw'] = list(dec['cards_to_throw'])
+
     if dec['yaniv']:
         return dec
-   
-    if dec["pile_or_deck"] != 'deck':
+    print(dec)
+    print(last_cards_thrown)
+
+    if dec["pile_or_deck"] == 'deck':
         player2.append(get_card_from_deck())
     else:
         last_cards_thrown.remove(dec['pile_or_deck'])
         player2.append(dec['pile_or_deck'])
+    print("last_cards_thrown: ---", last_cards_thrown)
     for c in last_cards_thrown: 
         pile.append(copy.copy(c))
     for card in dec['cards_to_throw']:
         player2.remove(card)
-    last_cards_thrown = dec['cards_to_throw']
-    dec['current_hand'] = player2
+    last_cards_thrown = copy.copy(dec['cards_to_throw'])
+    print("pile : -----", pile)
+
     return dec
 @app.route("/sim_player3")
 def sim_player3():
     global last_cards_thrown, pile, player3
     dec = simulate(player3)
+    dec['cards_to_throw'] = list(dec['cards_to_throw'])
     if dec['yaniv']:
         return dec
-   
-    if dec["pile_or_deck"] != 'deck':
+    print(dec)
+    print("last_cards_thrown: ---", last_cards_thrown)
+
+    if dec["pile_or_deck"] == 'deck':
         player3.append(get_card_from_deck())
     else:
         last_cards_thrown.remove(dec['pile_or_deck'])
@@ -204,18 +228,21 @@ def sim_player3():
         pile.append(copy.copy(c))
     for card in dec['cards_to_throw']:
         player3.remove(card)
-    last_cards_thrown = dec['cards_to_throw']
-    dec['current_hand'] = player3
+    last_cards_thrown = copy.copy(dec['cards_to_throw'])
+    print("pile : -----", pile)
     return dec
 
 @app.route("/sim_player4")
 def sim_player4():
     global last_cards_thrown, pile, player4
     dec = simulate(player4)
+    dec['cards_to_throw'] = list(dec['cards_to_throw'])
     if dec['yaniv']:
         return dec
-   
-    if dec["pile_or_deck"] != 'deck':
+    print(dec)
+    print("last_cards_thrown: ---", last_cards_thrown)
+
+    if dec["pile_or_deck"] == 'deck':
         player4.append(get_card_from_deck())
     else:
         last_cards_thrown.remove(dec['pile_or_deck'])
@@ -224,8 +251,9 @@ def sim_player4():
         pile.append(copy.copy(c))
     for card in dec['cards_to_throw']:
         player4.remove(card)
-    last_cards_thrown = dec['cards_to_throw']
-    dec['current_hand'] = player4
+    last_cards_thrown = copy.copy(dec['cards_to_throw'])
+    print("pile : -----", pile)
+
     return dec
 
 
@@ -248,12 +276,13 @@ def simulate(player_hand:list):
     pair = set(check_for_pairs(player_hand))
     #check for straight
     straight = set(check_for_straghit(player_hand))
-
+    print(player_hand)
     dispute_card = "" # a card that exist in both straghit and pair
     completing_card_for_straghit = ""# a card that can complite a straghit and is draweble
     completing_card_for_pair = ""# a card that can complite a pair and is draweble
     missing_cards_for_straghit = [] #cards that can replace a joker in a strghit
     if len(straight) != 0 and len(pair) != 0:
+        
         missing_cards_for_straghit = find_missing_cards_for_straghit(straight)
         for card in pair:
             if card in straight:
@@ -270,9 +299,13 @@ def simulate(player_hand:list):
                 completing_card_for_pair = last_cards_thrown[-1]
     
     if get_sum(pair) > 6 and completing_card_for_straghit != "":
+        print("in case get_sum(pair) > 6 and completing_card_for_straghit != """)
+
         decision['cards_to_throw'] = pair
         decision['pile_or_deck'] = completing_card_for_straghit
     elif get_sum(straight) > get_sum(pair):
+        print("in case get_sum(straight) > get_sum(pair)")
+
         decision['cards_to_throw'] = straight
         copy_hand = [card for card in player_hand if not card in straight]
         copy_hand.append(last_cards_thrown[0])
@@ -290,7 +323,8 @@ def simulate(player_hand:list):
             decision['pile_or_deck'] = 'deck'
         else:
             decision['pile_or_deck'] = last_cards_thrown[0]
-    elif 0 < get_sum(straight) < 7 and get_sum(pair) > 7:
+    elif len(straight) == 0 and get_sum(pair) > 4:
+        print("in case len(straight) == 0 and get_sum(pair) > 4")
         decision['cards_to_throw'] = pair
         if int(last_cards_thrown[0][:2]) > 5:
             decision['pile_or_deck'] = last_cards_thrown[0] 
@@ -299,6 +333,7 @@ def simulate(player_hand:list):
         else:
             decision['pile_or_deck'] = 'deck'
     elif len(pair) == 0 and len(straight) == 0:
+        print("in case no pair no straghit")
         player_hand_copy = copy.copy(player_hand)
         player_hand_copy.append(last_cards_thrown[0])
         player_hand_copy.sort()
@@ -327,7 +362,8 @@ def simulate(player_hand:list):
                     player_hand_copy.remove(card)
                     final_opt.remove(card)
             decision['cards_to_throw'] = [player_hand_copy[-1]]
-            decision['pile_or_deck'] = final_opt
+            decision['pile_or_deck'] = final_opt.pop()
+
     return decision
 
 def get_sum(cards_set):
@@ -426,31 +462,4 @@ def reset_game():
 
 if __name__ == "__main__":
     reset_game()
-    # last_cards_thrown = ['05_of_clubs']
-    # case1 = [    
-    #         '11_of_clubs', 
-    #         '08_of_spades', 
-    #         '13_of_clubs', 
-    #         '05_of_hearts',
-    #         '00_black_joker'
-    #         ]
-    # case2 = [    
-    #         '11_of_clubs', 
-    #         '08_of_spades', 
-    #         '13_of_clubs', 
-    #         '08_of_hearts',
-    #         '00_black_joker'
-    #         ]
-    # case3 = [    
-    #         '11_of_clubs', 
-    #         '08_of_spades', 
-    #         '13_of_clubs', 
-    #         '08_of_hearts',
-    #         '00_black_joker'
-    #         ]
-    # print(simulate(case1))
-    # last_cards_thrown = ['05_of_clubs']
-    # print(simulate(case2))
-    # last_cards_thrown = ['05_of_clubs']
-    # print(simulate(case3))
     app.run(debug=True)

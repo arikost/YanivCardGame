@@ -15,8 +15,9 @@ class App extends Component {
       lastThrown : [],
       cardBtnStyle : {backgroundColor:'antiquewhite', borderWidth: 0},
       showPopUp : false,
-      popupInnetText : "",
-      currentPlyer : 2,
+      popupInnetText : [],
+      currentPlyer : 1,
+      isYaniv : false,
     };
   }
 togglePop() {
@@ -47,11 +48,11 @@ componentDidMount() {
         }
       )
       console.log('mount', this.state.items);
-      
+      this.isPasibleYaniv();
   }
 render() { 
    
-    const { error, isLoaded, items, pile, lastThrown} = this.state;
+    const { error, isLoaded, items, pile, lastThrown, popupInnetText} = this.state;
     if (error) {
         return <div>Error: {error.message}</div>;
       } else if (!isLoaded) {
@@ -84,6 +85,7 @@ render() {
                 >throw away selected cards</button>
                 <button className='btn btn-primary m-2 lr' onClick={this.resetSelectedCards.bind(this)}
                 >reset selected cards</button>
+                <button className='btn btn-success m-2 lr-btn' disabled={!this.state.isYaniv} onClick = {this.yaniv.bind(this)}>Yaniv</button>
             </div>
             {items.map((item, i) => 
             <button className='btn btn-light m-1' key={i} id={"card"+i} onClick={() => this.cardSelcted(i)} 
@@ -94,13 +96,72 @@ render() {
           </div>
           {
             
-            <PopUp trigger={this.state.showPopUp} onChange={this.simulatesPlayers.bind(this)} id="popup">
-              <h3>{this.state.popupInnetText}</h3>
-
+            <PopUp trigger={this.state.showPopUp}  id="popup">
+              <div>
+                {popupInnetText.map((item, i) =>
+                  <h4 key={"line" + i}>{item}</h4>
+                )}
+              </div>
+              <button className="btn btn-success m-2 lr-btn" onClick={this.simulatesPlayers.bind(this)} id="nextBtn">next</button>
             </PopUp>
           }
           </React.Fragment>);
     }
+}
+yaniv(){
+  var playerName = "player"+this.state.currentPlyer;
+  var scoreBoard = [];
+  var totleScoreBoard = [];
+  var game_leader = "";
+  var round_winner = "";
+  var gameOver = false;
+  var text = [];
+  fetch('/yaniv',{
+    'method': 'POST',
+    headers : {
+      'Content-Type':'application/json'
+    },
+    body: JSON.stringify({player: playerName})
+  }).then(
+    response => response.json()
+  ).catch(error => console.log(error))
+  
+  fetch("get_score").then(
+    res => res.json()
+  ).then(
+    (result) =>{
+      round_winner = result.round_winner;
+      scoreBoard = result.score;
+      game_leader = result.game_leader;
+      totleScoreBoard = result.totle_score;
+      gameOver = result.game_over;
+    }
+  )
+  text.push(playerName + " called YANIV");
+  if(round_winner !== playerName){
+    text.push("ASAF!!!!! called by " + round_winner);
+  }
+  
+  text.push("playr1     playr2     playr3     playr4");
+  text.push("score:");
+  text.push("  "+scoreBoard[0] + "    |  "+scoreBoard[1] + "    |  "+scoreBoard[2] + "    |  "+scoreBoard[3]);
+  text.push("totle score:");
+  text.push("  "+totleScoreBoard[0] + "    |  "+totleScoreBoard[1] + "    |  "+totleScoreBoard[2] + "    |  "+totleScoreBoard[3]);
+  if(gameOver){
+    text.push(game_leader+ " won the game");
+  }
+}
+isPasibleYaniv(){
+  fetch("/is_yaniv").then(
+    res => res.json()
+  ).then(
+    (result) => {
+        console.log("is_yaniv", result);
+        this.setState({
+          isYaniv : result.answer
+        })
+    }
+  )
 }
 simulatesPlayers(){ 
     fetch('/sim_player'+this.state.currentPlyer).then(
@@ -108,29 +169,17 @@ simulatesPlayers(){
     ).then(
       (result) => {
         console.log("sim result", result);
-        this.updatePile();
+        
         if(result.yaniv){
-          console.log('yaniv');
+          this.yaniv()
         }else{
         this.setState({
-            lastThrown : [...result.cards_to_throw],
+            lastThrown : [...result.cards_to_throw]
         });
-        
+        this.updatePile();
       }
       }
     )
-    if(this.state.currentPlyer !== 4){
-      this.setState({ 
-        currentPlyer: this.state.currentPlyer +1,
-        popupInnetText : "Press next to simulate player"+this.state.currentPlyer
-      });
-    }else{
-      this.setState({ 
-        currentPlyer: 2,
-        popupInnetText : "Your Turn To Play"
-      });
-      this.togglePop();
-    }
 }
 disabledCenter1(){
   if(this.state.disabledCenterFlag){
@@ -154,7 +203,7 @@ pileCardSelcted(i){
     headers : {
       'Content-Type':'application/json'
     },
-    body: JSON.stringify({cards: this.state.lastThrown[i]})
+    body: JSON.stringify({card: this.state.lastThrown[i]})
   }).then(
     response => response.json()
   ).catch(error => console.log(error))
@@ -168,7 +217,6 @@ pileCardSelcted(i){
   this.resetSelectedCards();
   this.setState({
     disabledCenterFlag : true,
-    popupInnetText : "Press next to simulate player"+this.state.currentPlyer
   });
   this.updatePile();
   this.togglePop();
@@ -186,7 +234,7 @@ getCardFromDeck(){
       temp.sort((a, b) => a.localeCompare(b));
       this.setState({
         items : temp,
-        lastThrown : [...this.state.selectedItems]
+        lastThrown : [...this.state.selectedItems],
       });
       this.resetSelectedCards();
       console.log('after get card', this.state);
@@ -194,8 +242,6 @@ getCardFromDeck(){
   );
   this.setState({
     disabledCenterFlag : true,
-    currentPlyer : 2,
-    popupInnetText : "Press next to simulate player"+this.state.currentPlyer
   });
   this.updatePile();
   this.togglePop();
@@ -207,9 +253,20 @@ updatePile(){
   ).then(
     (result) =>{
       console.log("pile", result);
-      this.setState({
-        pile : [...result.cards]
-      });
+      if(this.state.currentPlyer !== 4){
+        this.setState({
+          pile : [...result.cards],
+          currentPlyer : (this.state.currentPlyer + 1),
+          popupInnetText: ["Press next to simulate player" + (this.state.currentPlyer+1)]
+        });
+      }else{
+        this.setState({
+          pile : [...result.cards],
+          currentPlyer : 1,
+        })
+        this.isPasibleYaniv();
+        this.togglePop();  
+      }
     }
   )
 }
@@ -223,30 +280,18 @@ throwSelectedCards(){
       body: JSON.stringify({cards: this.state.selectedItems})
     }).then(
       response => response.json()
-    ).catch(error => console.log(error))
-    
-    fetch('/get_legalty')
-      .then(res => res.json())
-      .then(
-        (result) => {
-          if(result.legalty === 'true'){
-            var array = [...this.state.selectedItems];
-            this.deleteItems(array);
-          }
-        },
-        // Note: it's important to handle errors here
-        // instead of a catch() block so that we don't swallow
-        // exceptions from actual bugs in components.
-        (error) => {
+    ).catch(error => console.log(error)).then(
+      (response) => {
+        console.log("get_legalty:",response)
+        if(response.legalty){
+          var array = [...this.state.selectedItems];
+          this.deleteItems(array);
           this.setState({
-            isLoaded: true,
-            error
+            disabledCenterFlag : false
           });
         }
-      )
-      this.setState({
-        disabledCenterFlag : false
-      });
+      },
+    )
 }
 deleteItems(items){
   const newItems = this.state.items.filter(c => !(items.includes(c)));

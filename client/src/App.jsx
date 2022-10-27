@@ -17,14 +17,16 @@ class App extends Component {
       showPopUp : false,
       popupInnetText : [],
       currentPlyer : 1,
+      disabledResetRoundBtn : true,
+      disabledRestartGameBtn : true,
       isYaniv : false,
+      playersResult : []
     };
   }
 togglePop() {
     this.setState({
      showPopUp: !this.state.showPopUp
     });
-
 };
 componentDidMount() {
     fetch('/reset_player1_hand')
@@ -34,7 +36,9 @@ componentDidMount() {
           console.log('res ',result);
           this.setState({
             isLoaded: true,
-            items: result.members
+            items: result.members,
+            disabledResetRoundBtn: true,
+            disabledRestartGameBtn : true
           });
         },
         // Note: it's important to handle errors here
@@ -52,7 +56,7 @@ componentDidMount() {
   }
 render() { 
    
-    const { error, isLoaded, items, pile, lastThrown, popupInnetText} = this.state;
+    const { error, isLoaded, items, pile, lastThrown, popupInnetText, playersResult} = this.state;
     if (error) {
         return <div>Error: {error.message}</div>;
       } else if (!isLoaded) {
@@ -63,14 +67,14 @@ render() {
             <div className='center'>
               <button className='btn btn-primary m-2 lr' id='getCardFromDeckBtn' 
               onClick={this.getCardFromDeck.bind(this)} disabled={this.disabledCenter1()} >get card from deck</button>
-              <div>
+              
               {lastThrown.map((item, i) => 
             <button className='btn btn-light m-1' key={i + 10} id={"pileCard"+i} onClick={() => this.pileCardSelcted(i)} 
             style={this.state.cardBtnStyle} disabled={this.disabledCenter2(i)}>
             <img  src={require('./images/'+item + '.png')} alt='' id={"lastThrowenCardImg"+i} width={90} height={120}></img>
             </button>
             )
-            } </div>  
+            }  
             <div>
               {pile.map((item, i) =>
                 <img  src={require('./images/'+item + '.png')} key={i + 20} alt='' id={"pilecardImg"} width={60} height={90} style={{margin: "2px"}}></img>
@@ -90,7 +94,7 @@ render() {
             {items.map((item, i) => 
             <button className='btn btn-light m-1' key={i} id={"card"+i} onClick={() => this.cardSelcted(i)} 
             style={this.state.cardBtnStyle} >
-            <img  src={require('./images/'+item + '.png')} alt='' id={"cardImg"+i} width={150} height={200}></img>
+            <img key={100 + i} src={require('./images/'+item + '.png')} alt='' id={"cardImg"+i} width={150} height={200}></img>
             </button>
             )}        
           </div>
@@ -102,15 +106,53 @@ render() {
                   <h4 key={"line" + i}>{item}</h4>
                 )}
               </div>
-              <button className="btn btn-success m-2 lr-btn" onClick={this.simulatesPlayers.bind(this)} id="nextBtn">next</button>
-            </PopUp>
+              <button className="btn btn-success m-2 lr-btn" onClick={this.simulatesPlayers.bind(this)} id="nextBtn"
+              disabled={!this.state.disabledResetRoundBtn || !this.state.disabledRestartGameBtn}
+              hidden={!this.state.disabledResetRoundBtn || !this.state.disabledRestartGameBtn}>next</button>
+              
+                {playersResult.map((player, i) =>
+                <div className='player-res'>
+                  <h5 key={"player"+i} >{"player"+(i+1)+": "}</h5>
+                  {player.map((item) =>
+                    <img src={require('./images/'+item + '.png')} key={item + i} alt='' id={"playerCardImg"} width={60} height={90} style={{margin: "2px"}}></img>
+                  )}
+                </div>
+                )}
+                <div className="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button className="btn btn-primary me-md-2" type="butten" id="resetRound" onClick={this.resetRound.bind(this)}
+                disabled={this.state.disabledResetRoundBtn} hidden={this.state.disabledResetRoundBtn} >Next Round</button>
+                <button className="btn btn-primary" type="butten" id="restartGame" onClick={this.restartGame.bind(this)}
+                disabled={this.state.disabledRestartGameBtn} hidden={this.state.disabledRestartGameBtn}>Restart Game</button>
+              </div>            </PopUp>
           }
           </React.Fragment>);
     }
 }
+resetRound(){
+  fetch("/reset_round")
+  this.componentDidMount();
+  this.setState({
+    selectedItems: [],
+    disabledCenterFlag : true,
+    pile : [],
+    lastThrown : [],
+    showPopUp : false,
+    popupInnetText : [],
+    currentPlyer : 0,
+    disabledResetRoundBtn : true,
+    disabledRestartGameBtn : true,
+    isYaniv : false,
+    playersResult : []
+  })
+  this.updatePile();
+  this.togglePop();
+}
+restartGame(){
+  fetch("/reset_game")
+  this.resetRound()
+}
 yaniv(){
   var playerName = "player"+this.state.currentPlyer;
-  var scoreBoard = [];
   var totleScoreBoard = [];
   var game_leader = "";
   var round_winner = "";
@@ -126,30 +168,35 @@ yaniv(){
     response => response.json()
   ).catch(error => console.log(error))
   
-  fetch("get_score").then(
+  fetch("/get_score").then(
     res => res.json()
   ).then(
-    (result) =>{
+    (result) => {
+      console.log("get_score: ",result)
       round_winner = result.round_winner;
-      scoreBoard = result.score;
       game_leader = result.game_leader;
-      totleScoreBoard = result.totle_score;
+      totleScoreBoard = [...result.totle_score];
       gameOver = result.game_over;
+      text.push(playerName + " called YANIV");
+      if(round_winner !== playerName){
+        text.push("ASAF!!!!! called by " + round_winner);
+      }
+      text.push("totle score:");
+      text.push("player1: "+totleScoreBoard[0] + "|  player2: "+totleScoreBoard[1] + "|  player3: "+totleScoreBoard[2] + "|  player4: "+totleScoreBoard[3]);
+      if(gameOver){
+        text.push(game_leader+ " won the game");
+        this.setState({disabledRestartGameBtn : false})
+      }else{
+        this.setState({disabledResetRoundBtn : false})
+      }
+      this.setState({
+        popupInnetText : text,
+        showPopUp : true,
+        playersResult : [...result.players_cards]
+      })
+
     }
   )
-  text.push(playerName + " called YANIV");
-  if(round_winner !== playerName){
-    text.push("ASAF!!!!! called by " + round_winner);
-  }
-  
-  text.push("playr1     playr2     playr3     playr4");
-  text.push("score:");
-  text.push("  "+scoreBoard[0] + "    |  "+scoreBoard[1] + "    |  "+scoreBoard[2] + "    |  "+scoreBoard[3]);
-  text.push("totle score:");
-  text.push("  "+totleScoreBoard[0] + "    |  "+totleScoreBoard[1] + "    |  "+totleScoreBoard[2] + "    |  "+totleScoreBoard[3]);
-  if(gameOver){
-    text.push(game_leader+ " won the game");
-  }
 }
 isPasibleYaniv(){
   fetch("/is_yaniv").then(
@@ -287,7 +334,8 @@ throwSelectedCards(){
           var array = [...this.state.selectedItems];
           this.deleteItems(array);
           this.setState({
-            disabledCenterFlag : false
+            disabledCenterFlag : false,
+            isYaniv : false
           });
         }
       },

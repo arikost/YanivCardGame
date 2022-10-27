@@ -106,11 +106,11 @@ app = Flask(__name__)
 def is_yaniv():
     return {"answer" : get_sum(player1) <= 7}
 
-@app.route("/reset_round", methods=['POST'])
+@app.route("/reset_round")
 def reset_round():
     reset_ruond_helper()
-    return ""
-@app.route("/reset_game", methods=['POST'])
+    return {}
+@app.route("/reset_game")
 def reset_game():
     global totle_score
     totle_score['player1'] = 0
@@ -118,7 +118,7 @@ def reset_game():
     totle_score['player3'] = 0
     totle_score['player4'] = 0
     reset_ruond_helper()
-    return ""
+    return {}
 
 
 @app.route("/yaniv", methods=['POST'])
@@ -135,8 +135,7 @@ def yaniv():
         if p <= player_score:
             score[player] = 35
         score[k] = p
-        totle_score[k] += p
-    return ""
+    return {}
 
 
 @app.route("/get_score")
@@ -144,9 +143,9 @@ def get_score():
     global score, totle_score
     print(score)
     print(totle_score)
-    for k in score.keys():
-        totle_score[k] += score[k] 
     game_over = False
+    for k in totle_score.keys():
+        totle_score[k] += score[k] 
     for v in totle_score.values():
         if v > 150:
             game_over = True
@@ -164,9 +163,9 @@ def get_score():
         if score[k] < best_score:
             best_score = score[k]
             round_winner = k   
-    print("---------------------------------")
-    return {"score": [score['player1'], score['player2'], score['player3'], score['player4']], 
-            "totle_score" : [totle_score['player1'], totle_score['player2'], totle_score['player3'], totle_score['player4']], 
+    return {
+            "totle_score" : [str(totle_score['player1']), str(totle_score['player2']), str(totle_score['player3']), str(totle_score['player4'])], 
+            "players_cards" : [player1, player2, player3, player4],
             "game_over" : game_over,
             "game_leader" : game_leader, 
             "round_winner" : round_winner
@@ -185,6 +184,8 @@ def get_card_deck():
     for c in last_cards_thrown:
         pile.append(c)
     last_cards_thrown = copy.copy(last_cards_thrown_buff)
+    last_cards_thrown_buff.clear()
+
     return {"card": card}
 
 @app.route("/get_card_pile", methods=['POST'])
@@ -197,13 +198,13 @@ def get_card_pile():
     for c in last_cards_thrown:
         pile.append(c)
     last_cards_thrown = copy.copy(last_cards_thrown_buff)
-
-
-    print("pile: ---", pile)
-    return ''
+    last_cards_thrown_buff.clear()
+    return {}
 
 @app.route("/get_pile")
 def get_pile():
+    print("pile: ---", pile)
+
     return {"cards" : pile}
 
 
@@ -216,8 +217,12 @@ def check_legale_move():
     
     data.sort()
     check1 = check_for_straghit(data)
+    
     check2 = check_for_pairs(data)
     if len(check1) == len(data) or len(check2) == len(data) or len(data) == 1:
+        if len(check1) == len(data) and len(check2) == 0:
+            sort_straghit(data)
+
         legalty = True
     else:
         legalty = False
@@ -227,7 +232,6 @@ def check_legale_move():
             player1.remove(x)
             last_cards_thrown_buff.append(x)
         
-        print("pile : -----", pile)
     return {'legalty' : legalty}
 @app.route("/sim_player2")
 def sim_player2():
@@ -241,12 +245,11 @@ def sim_player2():
 
     if dec["pile_or_deck"] == 'deck':
         player2.append(get_card_from_deck())
-        last_cards_thrown.clear()
     else:
         last_cards_thrown.remove(dec['pile_or_deck'])
         player2.append(dec['pile_or_deck'])
-        for c in last_cards_thrown: 
-            pile.append(copy.copy(c))
+    for c in last_cards_thrown: 
+        pile.append(copy.copy(c))
     for card in dec['cards_to_throw']:
         player2.remove(card)
     last_cards_thrown = copy.copy(dec['cards_to_throw'])
@@ -315,9 +318,12 @@ def simulate(player_hand:list):
         return decision 
     player_hand.sort()
     #check fo pairs
-    pair = set(check_for_pairs(player_hand))
+    pair = check_for_pairs(player_hand)
     #check for straight
-    straight = set(check_for_straghit(player_hand))
+    straight = check_for_straghit(player_hand)
+    if len(straight) > 2:
+        straight.sort()
+        sort_straghit(straight)
     print(player_hand)
     completing_card_for_straghit = ""# a card that can complite a straghit and is draweble
     completing_card_for_pair = ""# a card that can complite a pair and is draweble
@@ -400,14 +406,18 @@ def simulate(player_hand:list):
         player_hand_copy.sort()
         opt_for_pair1 = check_for_pairs(player_hand_copy)
         opt_for_str1 = check_for_straghit(player_hand_copy)
+        
         player_hand_copy.remove(last_cards_thrown[0])
-        player_hand_copy.append(last_cards_thrown[-1])
-        player_hand_copy.sort()
-
-        opt_for_pair2 = check_for_pairs(player_hand_copy)
-        opt_for_str2 = check_for_straghit(player_hand_copy)
-        player_hand_copy.remove(last_cards_thrown[-1])
-        options = [opt_for_pair1, opt_for_pair2, opt_for_str1, opt_for_str2]
+        options = [opt_for_pair1, opt_for_str1]
+        if len(last_cards_thrown) > 1:
+            player_hand_copy.append(last_cards_thrown[-1])
+            player_hand_copy.sort()
+       
+            opt_for_pair2 = check_for_pairs(player_hand_copy)
+            opt_for_str2 = check_for_straghit(player_hand_copy)
+            player_hand_copy.remove(last_cards_thrown[-1])
+            options.append( opt_for_pair2)
+            options.append( opt_for_str2)
         final_opt = options[0]
         max_sum = 0
         for opt in options:
@@ -417,18 +427,20 @@ def simulate(player_hand:list):
                 final_opt = opt
         if max_sum == 0:
             decision['cards_to_throw'] = [player_hand[-1]]
-            if int(last_cards_thrown[0][:2]) < 4:
+            if int(last_cards_thrown[0][:2]) < 2:
                 decision['pile_or_deck'] = last_cards_thrown[0]
             else:
                 decision['pile_or_deck'] = "deck"
         else:
             for card in player_hand_copy:
                 if card in final_opt:
-                    player_hand_copy.remove(card)
                     final_opt.remove(card)
-            decision['cards_to_throw'] = [player_hand_copy[-1]]
+                else:
+                    decision['cards_to_throw'] = [card]
+            
+            
             decision['pile_or_deck'] = final_opt.pop()
-
+    
     return decision
 
 def get_sum(cards_set):
@@ -475,12 +487,15 @@ def check_for_straghit(player_hand):
                         current_straghit.add('_'.join(card_i_prop))
                         current_straghit.add('_'.join(card_j_prop))
                         card_i_prop = card_j_prop
-
-    
-        if len(current_straghit) > 2:
+        
+        if len(current_straghit) == 2 and joker_red == 1:
+            current_straghit.add("00_red_joker")
+        elif len(current_straghit) == 2 and joker_black == 1:
+            current_straghit.add("00_black_joker")
+        if len(current_straghit) > 2 and len(current_straghit) > len(straight):
             straight = copy.copy(current_straghit)
         current_straghit.clear()
-    return straight
+    return list(straight)
 
 def check_for_pairs(player_hand):
     pair1 = set()
@@ -497,10 +512,26 @@ def check_for_pairs(player_hand):
                 pair2.add(player_hand[i+1])
     
     if get_sum(pair1) >= get_sum(pair2):
-        return pair1
+        return list(pair1)
     else:
-        return pair2
-
+        return list(pair2)
+def sort_straghit(straghit:list):
+    straghit.sort()
+    ms = find_missing_cards_for_straghit(straghit)
+    print(ms)
+    if len(ms) == 1:
+        if (straghit[0] == '00_red_joker' or  straghit[0] == '00_black_joker') and straghit[1][:2] == "01":
+            temp = straghit[2]
+            straghit[2] = straghit[0]
+            straghit[0] = temp
+        else:
+            temp = straghit[1] 
+            straghit[1] = straghit[0]
+            straghit[0] = temp
+    elif len(ms) == 2:
+        temp = straghit[2] 
+        straghit[2] = straghit[0]
+        straghit[0] = temp
 
 def find_missing_cards_for_straghit(straghit):
     card_list = list(straghit)
@@ -511,15 +542,49 @@ def find_missing_cards_for_straghit(straghit):
             continue
         if int(card_list[i][:2]) == int(card_list[i+1][:2])-2:
             rank = int(card_list[i][:2])+1
-            return_val.append(str(rank)+ card_list[i][2::])
+            if rank < 10:
+                return_val.append("0"+str(rank)+ card_list[i][2::])
+            else:
+                return_val.append(str(rank)+ card_list[i][2::])
+
         if int(card_list[i][:2]) == int(card_list[i+1][:2])-3:
             rank = int(card_list[i][:2])+1
-            return_val.append(str(rank)+ card_list[i][2::])
-            return_val.append(str(rank+1)+ card_list[i][2::])
-        
+            if rank < 10:
+                return_val.append("0"+str(rank)+ card_list[i][2::])
+            else:
+                return_val.append(str(rank)+ card_list[i][2::])
+            if rank < 9:
+                return_val.append("0"+str(rank+1)+ card_list[i][2::])
+            elif rank < 13:
+                return_val.append(str(rank+1)+ card_list[i][2::])
+    if int(card_list[0][:2]) == 0 and int(card_list[1][:2]) == 1:
+        rank = int(card_list[-1][:2])
+        if rank < 9:
+            return_val.append("0"+str(rank+1)+ card_list[-1][2::])
+        elif rank < 13:
+            return_val.append(str(rank+1)+ card_list[-1][2::])
+    elif int(card_list[0][:2]) == int(card_list[1][:2])-1 and int(card_list[0][:2]) != 0:
+        rank = int(card_list[0][:2])
+        if rank != 0:
+            if rank < 11:
+                return_val.append("0"+str(rank-1)+ card_list[0][2::])
+            else:
+                return_val.append(str(rank-1)+ card_list[0][2::])
+        if rank < 8:
+            return_val.append("0"+str(rank+2)+ card_list[0][2::])
+        elif rank < 12:
+            return_val.append(str(rank+2)+ card_list[0][2::])
+
     return return_val
 def reset_ruond_helper():
     global card_deck, cards, player1, player2, player3, player4, score
+    card_deck.clear()
+    player1.clear()
+    player2.clear()
+    player3.clear()
+    player4.clear()
+    last_cards_thrown.clear()
+    pile.clear()
     card_deck = copy.copy(cards)
     score['player1'] = 0
     score['player2'] = 0
@@ -533,4 +598,7 @@ def reset_ruond_helper():
 
 if __name__ == "__main__":
     reset_ruond_helper()
+    arr = ["02_of_hearts", "00_black_joker", "04_of_hearts", "05_of_hearts"]
+    arr.sort()
+    print(check_for_straghit(arr))
     app.run(debug=True)

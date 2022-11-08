@@ -8,7 +8,7 @@
     border-radius: 30px;
     border-style: inset;
     border-width: 5px;
-    background-color: antiquewhite;  
+    background-color: aliceblue;
     align-items: center;
 }
 .playerHand{
@@ -21,7 +21,7 @@
   border-radius: 30px;
   border-width: 5px;
   align-items: center;
-  background-color: antiquewhite;  
+  background-color: aliceblue; 
 
 }
 .close-btn{
@@ -37,4 +37,55 @@
   align-items: center;
   height: auto;
   width: 100%;
+}
+.sign-up{
+  position: fixed;
+  top : 0;
+  left : 0;
+  width: 100%;
+  height: 100vh;
+  background-color: rgb(140, 137, 137);
+  
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.sign-up-inner{
+  position: fixed;
+  border-radius: 30px;
+  border-style: groove;  
+  border-width: 5px;  
+  padding: 32px;
+  width: auto;
+  height: auto;
+  max-width: 640px;
+  background-color: aliceblue;
+  display: inline-block;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-content: center;
+}
+.input-form{
+  align-items: center;
+  padding: 10px;
+}
+.input-form-ok{
+  align-items: center;
+  padding: 10px;
+  background-color: rgb(187, 221, 152);
+}
+.input-form-bad{
+  align-items: center;
+  padding: 10px;
+  background-color: rgb(227, 144, 163);
+}
+.card-btn{
+  background-color:'antiquewhite'; 
+  border-width: 0
+}
+.lobby-link{
+  padding: 10px;
+  justify-content: center;
+  text-align: center;
 }

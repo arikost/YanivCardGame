@@ -7,6 +7,9 @@ class Sginup extends Component {
         password: null,
         passwordConfirmation: null,
      } 
+    componentWillUnmount(){
+        console.log("unmount signup");
+    }
     render() { 
         
         return (
@@ -60,7 +63,7 @@ class Sginup extends Component {
                 password : this.state.password
             })
         });
-        this.props.onClick();
+        this.props.onDelete();
     }
     getClass(){
         if(this.state.passwordConfirmation === null){

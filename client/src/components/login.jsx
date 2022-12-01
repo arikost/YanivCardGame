@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import SignUp from './signUp';
-import Lobby from './lobby';
+import {Lobby} from './lobby';
 
 class Login extends Component {
     state = { 
@@ -14,12 +14,12 @@ class Login extends Component {
         const {msg, isLogin, isSignUpPressed} = this.state;
         if(isLogin){
             return(
-                <Lobby value={this.state.user}></Lobby>
+                <Lobby value={this.state.user}/>
             )
         }
         if(isSignUpPressed){
             return(
-                <SignUp onClick={() => this.setState({
+                <SignUp onDelete={() => this.setState({
                     isSignUpPressed : !isSignUpPressed,
                     msg : "SignUp Successfuly"
                     })}></SignUp>

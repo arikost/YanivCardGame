@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import "../App.css";
+import {socket} from "./lobby";
 
 class Game extends Component {
     constructor(props){
@@ -7,7 +8,6 @@ class Game extends Component {
         this.state = {
             userName: this.props.value,
             gameId : this.props.id,
-            socket : this.props.socket,
             pile : [],
             lastThrown : [],
             showPopUp : false,
@@ -19,41 +19,40 @@ class Game extends Component {
             cardBtnStyle : {backgroundColor:'antiquewhite', borderWidth: 0},
         }
     }
-    connectSocket(){
-        this.state.socket.on("opponent_join", (data) => {
-            if(data.gameId === this.state.gameId){
-
-                this.setState({
-                    players : [...data.opponents]
-                })
-                if(this.state.players.length === 4){
-                    fetch('/reset_round', {
-                        'method' : 'POST',
-                        headers : {
-                            'Content-Type':'application/json'
-                        },
-                        body: JSON.stringify({
-                            username: this.state.userName,
-                            gameId : this.state.gameId
-                        })
-                    }).then(
-                        response => response.json()
-                    ).catch(error => console.log(error)).then(
-                        (response) =>{
-                            console.log('cards', response)
-                            this.setState({
-                                myCards : [...response.cards]                        
-                            });
-                        }
-                    )
-                }
+    componentDidMount(){
+        socket.emit('opponent_join', this.state.gameId);
+        socket.on("opponent_join", (data) => {
+            this.setState({
+                players : [...data.opponents]
+            })
+            if(this.state.players.length === 4){
+                fetch('/reset_round', {
+                    'method' : 'POST',
+                    headers : {
+                        'Content-Type':'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: this.state.userName,
+                        gameId : this.state.gameId
+                    })
+                }).then(
+                    response => response.json()
+                ).catch(error => console.log(error)).then(
+                    (response) =>{
+                        console.log('cards', response)
+                        this.setState({
+                            myCards : [...response.cards]                        
+                        });
+                    }
+                )
             }
         });
-      
-    }
-    componentDidMount(){
-        this.connectSocket();
-        this.state.socket.emit('opponent_join',[this.state.userName, this.state.gameId]);
+        socket.on('opponent_leave', (data) =>{
+            this.setState({players: this.state.players.filter((player) => {
+                return player !== data.player
+            })});
+        });
+
     }
     render() { 
         const {userName, players, myCards} = this.state;
@@ -62,8 +61,10 @@ class Game extends Component {
                 <React.Fragment>
                     <div className='center'>
                         <h2>{"User Name: "+userName}</h2>
+                        <button className='btn btn-primary m-2 lr' onClick={this.props.onDelete}>Leave Game</button>
                         <h4>Waiting For Other Players To Join...</h4>
                         <h2>Current Players:</h2>
+                        
                         {players.map((opp) => 
                             <h3 key={opp}>{opp+ ' - has joined the game'}</h3>
                         )}

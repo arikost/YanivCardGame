@@ -76,11 +76,16 @@ class Game:
         self.number_of_players = 1
         self.players = [user]
         
-    
     def add_player(self, player:Player):
         self.players.append(player)
         self.number_of_players += 1
-    
+    def remove_player(self, player_name:str):
+        for player in self.players:
+            if player.name == player_name:
+                self.players.remove(player)
+                self.number_of_players -= 1
+                break
+
     def get_players_names(self):
         players_names = []
         for p in self.players:

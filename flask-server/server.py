@@ -3,17 +3,14 @@ import copy
 from game import Game
 from player import *
 import json
-import time
-import csv
 from flask import *
 from flask_socketio import SocketIO,emit
 from flask_cors import CORS
-import random
+import mysql.connector
 """globals"""
-fieldnames = ['userName', 'password', 'totle_wins']
 open_games_props = []
 open_games_ins = {}
-connected_users = []
+connected_users = {}
 num_of_open_games = 0
 
 app = Flask(__name__)
@@ -26,49 +23,121 @@ socketio = SocketIO(app,cors_allowed_origins="*")
 def opponent_join(data):
     global open_games_ins
     print(data)
-    game = open_games_ins[data[1]]
+    game:Game = open_games_ins[data]
     opponents = game.get_players_names()
-    emit('opponent_join', {'opponents' : opponents, 'gameId': data[1]}, broadcast=True)
-@socketio.on("connect")
-def connected():
-    """event listener when client connects to the server"""
-    print(request.sid)
-    print("client has connected")
-    emit("connect",{"data":f"id: {request.sid} is connected"})
+    for username in opponents:
+        emit('opponent_join', {'opponents' : opponents}, room=connected_users[username])
 
-def disconnected():
-    """event listener when client disconnects to the server"""
-    print("user disconnected")
-    emit("disconnect",f"user {request.sid} disconnected",broadcast=True)
+@socketio.on("user_connect")
+def connected(username):
+    """event listener when client connects to the server"""
+    if not username in connected_users.keys():
+        connected_users[username] = request.sid
+        print(username," has connected\t id:", request.sid)
+        mydb = mysql.connector.connect(
+            host = 'localhost',
+            user = 'arik',
+            password = 'abcdef',
+            database = 'mydb'
+        )
+        cursor = mydb.cursor()
+        cursor.execute("SELECT * FROM games")
+        games = cursor.fetchall()
+        socketio.emit('update_games', games, broadcast=True)
+        #close connection
+        cursor.close()
+        mydb.close()
+
+@app.route('/opponent_leaveing', methods=['POST'])
+def opponent_leaveing():
+    data = json.loads(request.data)
+    game:Game = open_games_ins[data['gameId']]
+    game.remove_player(data['player_name'])
+    #initial connection to database
+    mydb = mysql.connector.connect(
+        host = 'localhost',
+        user = 'arik',
+        password = 'abcdef',
+        database = 'mydb'
+    )
+    cursor = mydb.cursor()
+    if game.number_of_players == 0:
+        cursor.execute("DELETE from games WHERE id = %s", (data['gameId'],))
+        open_games_ins.pop(game.id)
+    else:
+        query = "UPDATE games SET current_players = %s, number_of_players = %s WHERE id = %s"
+        cursor.execute(query,(" ".join(game.get_players_names()),game.number_of_players ,game.id))
+    
+    cursor.execute("SELECT * FROM games")
+    games = cursor.fetchall()
+    print(games)
+
+    socketio.emit('update_games', games, broadcast=True)
+    for username in game.get_players_names():
+        emit('opponent_leave', {'player' : data['player_name']}, room=connected_users[username])
+    #close connection    
+    mydb.commit()
+    cursor.close()
+    mydb.close()
+    return {}
+
 
 @app.route('/sign_up',methods=['POST'])
 def sign_up():
-    global fieldnames
     data = json.loads(request.data)
-    with open('users.csv', 'a', newline='') as dataFile:
-        writer = csv.DictWriter(dataFile, fieldnames=fieldnames)
-        writer.writerow({'userName' : data['username'], 'password': data['password'], 'totle_wins': 0})
-        dataFile.close()
-    return {}
+    #initial connection to database
+    mydb = mysql.connector.connect(
+        host = 'localhost',
+        user = 'arik',
+        password = 'abcdef',
+        database = 'mydb'
+    )
+    cursor = mydb.cursor()
+    #check if user exist
+    cursor.execute("SELECT name from users")
+    for name in cursor:
+        if name == data['username']:
+            cursor.close()
+            mydb.close()
+            return {'user_exist': True}
+    #insert new user
+    cursor.execute("SELECT count(*) FROM users")
+    num_of_users = int(cursor.fetchone()[0] + 1)
+    insert_new_user = ("INSERT INTO users VALUES(%s, %s, %s, %s, %s)")
+    cursor.execute(insert_new_user, (num_of_users, data['username'], data['password'], 0, 0))
+    #save changes
+    mydb.commit()
+    #close connection
+    cursor.close()
+    mydb.close()
+    return {'user_exist': False}
 @app.route('/login', methods=['POST', 'GET'])
 def login():
-    global fieldnames, connected_users
+    global  connected_users
     data = json.loads(request.data)
     user_exsit = False
-    with open('users.csv', newline='') as dataFile:
-        reader = csv.reader(dataFile)
-        for row in reader:
-            if row[0] == data['username'] and row[1] == data['password']:
-                user_exsit = True
-                break
-    if user_exsit:
-        connected_users.append(data['username'])
+    #initial connection to database
+    mydb = mysql.connector.connect(
+        host = 'localhost',
+        user = 'arik',
+        password = 'abcdef',
+        database = 'mydb'
+    )
+    cursor = mydb.cursor()
+    #check if user exist and matching password
+    cursor.execute("SELECT name, password From users")
+    for (name, password) in cursor:
+        user_exsit = (name == data['username'] and password == data['password'])
+        if user_exsit: break 
+           
+    #insert new user
+    #close connection
+    cursor.fetchall()
+    cursor.close()
+    mydb.close()
+
     return {'isValidUser' : user_exsit}
 
-@app.route('/get_lobby_data', methods=['POST', 'GET'])
-def get_lobby_data():
-    global open_games_props, connected_users
-    return{'games' : open_games_props, 'users' : connected_users}
 
 
 
@@ -80,9 +149,35 @@ def create_game():
     player = Player(data['username'])
     game = Game(player, num_of_open_games)
     open_games_ins[num_of_open_games] = game
-    game_props = {"id" : game.id, "created_by" : player.name, "time_date" : datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "number_of_players" : 1, }
-    open_games_props.append(game_props)
-    return {"newGame" : game_props}
+    #initial connection to database
+    mydb = mysql.connector.connect(
+        host = 'localhost',
+        user = 'arik',
+        password = 'abcdef',
+        database = 'mydb'
+    )
+    cursor = mydb.cursor()
+    insert_new_game = ("INSERT INTO games VALUES(%s, %s, %s, %s, %s)")
+    players = ", ".join(game.get_players_names())
+    cursor.execute(insert_new_game, (
+            num_of_open_games, 
+            data['username'], 
+            datetime.now().strftime("%d/%m/%Y %H:%M:%S"), 
+            players, 
+            game.number_of_players
+        ))
+    cursor.execute("SELECT count(*) FROM games")
+    is_created = int(cursor.fetchone()[0]) == num_of_open_games+1
+    cursor.execute("SELECT * FROM games")
+    games = cursor.fetchall()
+    print(games)
+    socketio.emit('update_games', games, broadcast=True)
+    #close connection    
+    mydb.commit()
+    cursor.close()
+    mydb.close()
+    
+    return {"is_created" : is_created, "id" : game.id}
 
 
 
@@ -90,14 +185,29 @@ def create_game():
 def join_game():
     global connected_users, open_games_ins, open_games_props
     data = json.loads(request.data)
-    game = open_games_ins[data['gameId']]
-
+    game:Game = open_games_ins[data['gameId']]
     game.add_player(Player(data['username']))
     if game.number_of_players == 4:
         game.reset_game()
-    for game in open_games_props:
-        if game['id'] == data['gameId']:
-            game['number_of_players'] += 1 
+    #initial connection to database
+    mydb = mysql.connector.connect(
+        host = 'localhost',
+        user = 'arik',
+        password = 'abcdef',
+        database = 'mydb'
+    )
+    players = " ".join(game.get_players_names())
+    query = "UPDATE games SET current_players = %s WHERE id = %s"
+    cursor = mydb.cursor()
+    cursor.execute(query,(players, game.id))
+    mydb.commit()
+    cursor.execute("SELECT * FROM games")
+    socketio.emit('update_games', cursor.fetchall(), broadcast=True)
+    
+    #close connection
+    cursor.close()
+    mydb.close()
+
     return {}
 
 @app.route("/reset_round",methods=['POST', 'GET'])
@@ -105,7 +215,7 @@ def reset_round():
     global open_games_ins
     data = json.loads(request.data)
     print(data)
-    game = open_games_ins[data['gameId']]
+    game:Game = open_games_ins[data['gameId']]
     print(game.get_players_names())
     for player in game.players:
         print(player.name)
@@ -117,7 +227,7 @@ def reset_round():
 def reset_game():
     global open_games_ins
     data = json.loads(request.data)
-    game = open_games_ins[data['gameId']]
+    game:Game = open_games_ins[data['gameId']]
     game.reset_game()
     return {}
 
@@ -125,7 +235,7 @@ def reset_game():
 def is_yaniv():
     global open_games_ins
     data = json.loads(request.data)
-    game = Game(open_games_ins[data['gameId']])
+    game:Game = open_games_ins[data['gameId']]
     return {'answer' : game.is_yaniv(data['username'])}
 
 
@@ -139,7 +249,7 @@ def get_score():
 def get_card_deck():
     global open_games_ins
     data = json.loads(request.data)
-    game = Game(open_games_ins[data['gameId']])
+    game:Game = open_games_ins[data['gameId']]
     game.pull_card_from_deck(data['username'])
     return{}
 
@@ -148,7 +258,7 @@ def get_card_deck():
 def get_card_pile():
     global open_games_ins
     data = json.loads(request.data)
-    game = Game(open_games_ins[data['gameId']])
+    game:Game = open_games_ins[data['gameId']]
     game.pull_card_from_pile(data['username'], data['card'])
     return{}
 
@@ -157,7 +267,7 @@ def get_card_pile():
 def get_pile():
     global open_games_ins
     data = json.loads(request.data)
-    game = Game(open_games_ins[data['gameId']])
+    game:Game = open_games_ins[data['gameId']]
     return {'pile' : game.pile}
 
 
@@ -166,7 +276,7 @@ def get_pile():
 def check_legale_move():
     global open_games_ins
     data = json.loads(request.data)
-    game = Game(open_games_ins[data['gameId']])
+    game:Game = open_games_ins[data['gameId']]
     legalety = game.check_legal_move(data['username'], data['cards'])
     return {'legalety' : legalety}
     

@@ -3,6 +3,8 @@ import "../App.css";
 import Game from './game';
 import { io } from "socket.io-client";
 
+var socket;
+
 class Lobby extends Component {
    
     constructor(props){    
@@ -13,28 +15,42 @@ class Lobby extends Component {
         currentGames : [],
         gameId: 0,
         inGame : false,
-        socket : null
-        } 
+        }
+        socket = io("localhost:5001/", {
+            transports: ["websocket"],
+            cors: {
+            origin: "http://localhost:3000/",
+            },
+        });
     }
     componentDidMount(){
-        fetch('/get_lobby_data').then(
-            res => res.json()
-        ).then(
-            (result) => {
-                console.log(result);
-                this.setState({
-                    currentGames : result.games,
-                    currentUsers : result.users
-                })
-            }
-        )
-        console.log(this.state)
+        console.log("lobby mounted");
+        socket.emit('user_connect', this.state.userName);
+        socket.on('update_games', (data)=>{
+            console.log("update_games",data)
+            this.setState({
+                currentGames: data
+            });
+        });
+        
     }
     render() { 
-        const {currentGames, userName, inGame, gameId, socket} = this.state;
+        const {currentGames, userName, inGame, gameId} = this.state;
         if(inGame){
             return(
-                <Game id={gameId} value={userName} socket={socket}></Game>
+                <Game id={gameId} value={userName} onDelete={() =>{
+                    this.setState({inGame: false});
+                    fetch('opponent_leaveing',{
+                        'method': 'POST',
+                        headers : {
+                          'Content-Type':'application/json'
+                        },
+                        body: JSON.stringify({
+                          player_name : this.state.userName,
+                          gameId : this.state.gameId,
+                        })
+                    })
+                }}></Game>
             )
         }
         return (
@@ -43,9 +59,7 @@ class Lobby extends Component {
                 <h3>{"Welcome  "+userName}</h3>
                 <div>
                     <button className='btn btn-primary lr' onClick={this.createNewGame.bind(this)}>Create New Game</button>
-                    <button className='btn btn-primary m-2 lr'>Play against the computer</button>
-                    <button className='btn btn-secondary' onClick={this.componentDidMount.bind(this)}>Update List</button>
-
+                    <button className='btn btn-primary m-2 lr' hidden={true}>Play against the computer</button>
                 </div>
                 <style>{`
                     table, th, td{
@@ -60,7 +74,7 @@ class Lobby extends Component {
                         <th>ID</th>
                         <th>Created By</th>
                         <th>In Time</th>
-                        <th>Number Of Players</th>
+                        <th>Players</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -68,13 +82,13 @@ class Lobby extends Component {
                     {currentGames.map((game) =>
                     <tbody>
                     <tr>
-                        <td>{game.id}</td>
-                        <td>{game.created_by}</td>
-                        <td>{game.time_date}</td>
-                        <td>{game.number_of_players}</td>
-                        <td><button key={game.id} className='btn btn-primary m-2 sm'
-                                disabled={game.number_of_players === 4}
-                                onClick={() => this.joinGame(game.id)}
+                        <td>{game[0]}</td>
+                        <td>{game[1]}</td>
+                        <td>{game[2]}</td>
+                        <td>{game[3]}</td>
+                        <td><button key={game[0]} className='btn btn-primary m-2 sm'
+                                disabled={game[4] === 4}
+                                onClick={() => this.joinGame(game[0])}
                             >join
                             </button>
                             </td>
@@ -99,29 +113,13 @@ class Lobby extends Component {
             response => response.json()
         ).catch(error => console.log(error)).then(
             (response) =>{
+                console.log("creatNewGame response", response);
                 this.setState({
-                    gameId : response.newGame.id,
+                    gameId : response.id,
                     inGame : true
                 });
             }
         )
-        const socket = io("localhost:5001/", {
-            transports: ["websocket"],
-            cors: {
-              origin: "http://localhost:3000/",
-            },
-        });
-        socket.on("connect", (data) => {
-            console.log(data);
-        });
-        this.setState({socket : socket});
-        socket.on("disconnect", (data) => {
-            console.log(data);
-        });
-        return function cleanup() {
-            socket.disconnect();
-        };
-    
     }
     joinGame(gameId){
         fetch('/join_game', {
@@ -139,25 +137,8 @@ class Lobby extends Component {
         this.setState({
             gameId : gameId,
             inGame : true
-        })
-        const socket = io("localhost:5001/", {
-            transports: ["websocket"],
-            cors: {
-              origin: "http://localhost:3000/",
-            },
-        });
-        socket.on("connect", (data) => {
-            console.log(data);
-        });
-        this.setState({socket : socket});
-        socket.on("disconnect", (data) => {
-            console.log(data);
-        });
-        return function cleanup() {
-            socket.disconnect();
-        };
-    
+        })    
     }
 }
  
-export default Lobby;
+export {Lobby, socket};

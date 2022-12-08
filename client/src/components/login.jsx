@@ -14,7 +14,7 @@ class Login extends Component {
         const {msg, isLogin, isSignUpPressed} = this.state;
         if(isLogin){
             return(
-                <Lobby value={this.state.user}/>
+                <Lobby  value={this.state.user}/>
             )
         }
         if(isSignUpPressed){

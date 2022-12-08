@@ -19,14 +19,49 @@ CORS(app,resources={r"/*":{"origins":"*"}})
 socketio = SocketIO(app,cors_allowed_origins="*")
 
 
-@socketio.on('opponent_join')
-def opponent_join(data):
+@socketio.on('update_oppenents')
+def update_oppenents(data):
     global open_games_ins
-    print(data)
     game:Game = open_games_ins[data]
     opponents = game.get_players_names()
+    print("opponent_join(event call) : ",opponents)
     for username in opponents:
-        emit('opponent_join', {'opponents' : opponents}, room=connected_users[username])
+        emit('update_oppenents', {'opponents' : opponents}, room=connected_users[username])
+    if len(opponents) == 4:
+        player1 = opponents[0]
+        for p in game.players:
+            socketio.emit('reset_cards', {'cards' : p.hand, 'curr_player' : player1}, room=connected_users[p.name])
+
+@app.route("/join_game", methods=['POST'])
+def join_game():
+    global connected_users, open_games_ins
+    data = json.loads(request.data)
+    game:Game = open_games_ins[data['gameId']]
+    game.add_player(Player(data['username']))
+    print("join_game(event call)",game.get_players_names())
+    if game.number_of_players == 4:
+        game.reset_game()
+    #initial connection to database
+    mydb = mysql.connector.connect(
+        host = 'localhost',
+        user = 'arik',
+        password = 'abcdef',
+        database = 'mydb'
+    )
+    players = " ".join(game.get_players_names())
+    query = "UPDATE games SET current_players = %s WHERE id = %s"
+    cursor = mydb.cursor()
+    cursor.execute(query,(players, game.id))
+    mydb.commit()
+    cursor.execute("SELECT * FROM games")
+    socketio.emit('update_games', cursor.fetchall(), broadcast=True)
+    
+    #close connection
+    cursor.close()
+    mydb.close()
+    return {'id' : game.id}
+
+
 
 @socketio.on("user_connect")
 def connected(username):
@@ -43,16 +78,17 @@ def connected(username):
         cursor = mydb.cursor()
         cursor.execute("SELECT * FROM games")
         games = cursor.fetchall()
-        socketio.emit('update_games', games, broadcast=True)
         #close connection
         cursor.close()
         mydb.close()
+        socketio.emit('update_games', games, broadcast=True)
 
 @app.route('/opponent_leaveing', methods=['POST'])
 def opponent_leaveing():
     data = json.loads(request.data)
     game:Game = open_games_ins[data['gameId']]
     game.remove_player(data['player_name'])
+    print("opponent_leaveing: ", game.get_players_names())
     #initial connection to database
     mydb = mysql.connector.connect(
         host = 'localhost',
@@ -70,15 +106,13 @@ def opponent_leaveing():
     
     cursor.execute("SELECT * FROM games")
     games = cursor.fetchall()
-    print(games)
 
-    socketio.emit('update_games', games, broadcast=True)
-    for username in game.get_players_names():
-        emit('opponent_leave', {'player' : data['player_name']}, room=connected_users[username])
     #close connection    
     mydb.commit()
     cursor.close()
     mydb.close()
+    socketio.emit('update_games', games, broadcast=True)
+
     return {}
 
 
@@ -135,7 +169,6 @@ def login():
     cursor.fetchall()
     cursor.close()
     mydb.close()
-
     return {'isValidUser' : user_exsit}
 
 
@@ -176,39 +209,10 @@ def create_game():
     mydb.commit()
     cursor.close()
     mydb.close()
-    
     return {"is_created" : is_created, "id" : game.id}
 
 
 
-@app.route("/join_game", methods=['POST'])
-def join_game():
-    global connected_users, open_games_ins, open_games_props
-    data = json.loads(request.data)
-    game:Game = open_games_ins[data['gameId']]
-    game.add_player(Player(data['username']))
-    if game.number_of_players == 4:
-        game.reset_game()
-    #initial connection to database
-    mydb = mysql.connector.connect(
-        host = 'localhost',
-        user = 'arik',
-        password = 'abcdef',
-        database = 'mydb'
-    )
-    players = " ".join(game.get_players_names())
-    query = "UPDATE games SET current_players = %s WHERE id = %s"
-    cursor = mydb.cursor()
-    cursor.execute(query,(players, game.id))
-    mydb.commit()
-    cursor.execute("SELECT * FROM games")
-    socketio.emit('update_games', cursor.fetchall(), broadcast=True)
-    
-    #close connection
-    cursor.close()
-    mydb.close()
-
-    return {}
 
 @app.route("/reset_round",methods=['POST', 'GET'])
 def reset_round():
@@ -231,27 +235,22 @@ def reset_game():
     game.reset_game()
     return {}
 
-@app.route("/is_yaniv",methods=['POST', 'GET'])
-def is_yaniv():
-    global open_games_ins
-    data = json.loads(request.data)
-    game:Game = open_games_ins[data['gameId']]
-    return {'answer' : game.is_yaniv(data['username'])}
 
-
-
-
-@app.route("/get_score",methods=['POST', 'GET'])
-def get_score():
-    pass
 
 @app.route("/get_card_deck",methods=["POST", "GET"])
 def get_card_deck():
     global open_games_ins
     data = json.loads(request.data)
     game:Game = open_games_ins[data['gameId']]
-    game.pull_card_from_deck(data['username'])
-    return{}
+    card = game.pull_card_from_deck(data['username'])
+    is_yaniv = game.is_yaniv(data['username'])
+    players = game.get_players_names()
+    next_player = players.index(data['username'])
+    for p in players:
+        socketio.emit('update_center',{ 'current_player':players[(next_player+1) % 4], 
+        'last_cards' : game.last_cards_thrown, 'pile' : game.pile[-5::]},
+         room=connected_users[p])
+    return{'card' : card, 'is_yaniv' : is_yaniv}
 
     
 @app.route("/get_card_pile", methods=["POST", "GET"])
@@ -260,16 +259,14 @@ def get_card_pile():
     data = json.loads(request.data)
     game:Game = open_games_ins[data['gameId']]
     game.pull_card_from_pile(data['username'], data['card'])
-    return{}
-
-
-@app.route("/get_pile",methods=["POST", "GET"])
-def get_pile():
-    global open_games_ins
-    data = json.loads(request.data)
-    game:Game = open_games_ins[data['gameId']]
-    return {'pile' : game.pile}
-
+    is_yaniv = game.is_yaniv(data['username'])
+    players = game.get_players_names()
+    next_player = players.index(data['username'])
+    for p in players:
+        socketio.emit('update_center',{ 'current_player':players[(next_player+1) % 4], 
+        'last_cards' : game.last_cards_thrown, 'pile' : game.pile[-5::]},
+         room=connected_users[p])
+    return{'is_yaniv' : is_yaniv}
 
 
 @app.route("/check_legal_move", methods=["POST", "GET"])
@@ -288,5 +285,4 @@ if __name__ == "__main__":
     # game_test.reset_game()
     # for p in game_test.players:
     #     print(p.hand)
-    
     socketio.run(app, debug=True,port=5001)

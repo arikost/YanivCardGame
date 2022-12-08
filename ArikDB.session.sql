@@ -1,1 +1,1 @@
-SELECT * FROM games;
+SELECT * from games;

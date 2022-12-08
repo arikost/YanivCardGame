@@ -39,18 +39,26 @@ class Lobby extends Component {
         if(inGame){
             return(
                 <Game id={gameId} value={userName} onDelete={() =>{
-                    this.setState({inGame: false});
-                    fetch('opponent_leaveing',{
+                    fetch('/opponent_leaveing', {
                         'method': 'POST',
                         headers : {
-                          'Content-Type':'application/json'
+                        'Content-Type':'application/json'
                         },
                         body: JSON.stringify({
-                          player_name : this.state.userName,
-                          gameId : this.state.gameId,
+                            player_name : this.state.userName,
+                            gameId : gameId
                         })
-                    })
-                }}></Game>
+                    }).then(
+                        response => {
+                            response.json();
+                            socket.emit('update_oppenents', gameId);
+                            this.setState({
+                                inGame : false
+                            });    
+                        }
+                    ).catch(error => console.log(error))
+                }}
+                ></Game>
             )
         }
         return (
@@ -80,13 +88,13 @@ class Lobby extends Component {
                 </thead>
                 
                     {currentGames.map((game) =>
-                    <tbody>
+                    <tbody key={new Date().getMilliseconds()}>
                     <tr>
                         <td>{game[0]}</td>
                         <td>{game[1]}</td>
                         <td>{game[2]}</td>
                         <td>{game[3]}</td>
-                        <td><button key={game[0]} className='btn btn-primary m-2 sm'
+                        <td><button key={""+game[0]} className='btn btn-primary m-2 sm'
                                 disabled={game[4] === 4}
                                 onClick={() => this.joinGame(game[0])}
                             >join
@@ -132,12 +140,15 @@ class Lobby extends Component {
                 gameId : gameId
             })
         }).then(
-            response => response.json()
+            response => {
+                response.json();
+                this.setState({
+                    gameId : gameId,
+                    inGame : true
+                })    
+            }
+                
         ).catch(error => console.log(error))
-        this.setState({
-            gameId : gameId,
-            inGame : true
-        })    
     }
 }
  

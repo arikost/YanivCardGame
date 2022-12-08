@@ -107,6 +107,7 @@ class Game:
             player.current_score = 0
             for _ in range(5):
                 player.hand.append(self.get_card_from_deck())
+            player.hand.sort()
 
     def get_card_from_deck(self):
         if len(self.card_deck) < 2:
@@ -147,13 +148,16 @@ class Game:
     
     def pull_card_from_deck(self, player_name):
         card = self.get_card_from_deck()
+        print("pull_card_from_deck: ", card)
         for p in self.players:
             if p.name == player_name:
                 p.hand.append(card)
+                
         for c in self.last_cards_thrown:
             self.pile.append(c)
         self.last_cards_thrown = copy.copy(self.last_cards_thrown_buff)
         self.last_cards_thrown_buff.clear()
+        return card
     
     def is_yaniv(self, player_name):
         for p in self.players:

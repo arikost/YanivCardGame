@@ -85,7 +85,11 @@ class Game:
                 self.players.remove(player)
                 self.number_of_players -= 1
                 break
-
+    def get_player(self, player_name):
+        for p in self.players:
+            if p.name == player_name:
+                return p
+        return None
     def get_players_names(self):
         players_names = []
         for p in self.players:
@@ -95,9 +99,9 @@ class Game:
     def reset_game(self):
         for p in self.players:
             p.totle_score = 0
-        self.reset_ruond_helper()
+        self.reset_ruond()
 
-    def reset_ruond_helper(self):
+    def reset_ruond(self):
         self.card_deck.clear()
         self.last_cards_thrown.clear()
         self.pile.clear()
@@ -105,6 +109,7 @@ class Game:
         for player in self.players:
             player.hand.clear()
             player.current_score = 0
+            player.is_ready = False
             for _ in range(5):
                 player.hand.append(self.get_card_from_deck())
             player.hand.sort()
@@ -125,15 +130,18 @@ class Game:
         if len(check1) == len(cards) or len(check2) == len(cards) or len(cards) == 1:
             if len(check1) == len(cards) and len(check2) == 0:
                 sort_straghit(cards)
+                print("1::",cards)
             legalty = True
             for p in self.players:
                 if p.name == player_name:  
                     self.last_cards_thrown_buff.clear()
                     for card in cards:
                         p.hand.remove(card)
-                        self.last_cards_thrown_buff.append(card)         
+                        self.last_cards_thrown_buff.append(card)
+            print("2::",self.last_cards_thrown_buff)         
         else:
             legalty = False
+       
         return legalty
     
     def pull_card_from_pile(self, player_name, card):
@@ -156,6 +164,7 @@ class Game:
         for c in self.last_cards_thrown:
             self.pile.append(c)
         self.last_cards_thrown = copy.copy(self.last_cards_thrown_buff)
+        print("3::", self.last_cards_thrown)
         self.last_cards_thrown_buff.clear()
         return card
     
@@ -163,5 +172,52 @@ class Game:
         for p in self.players:
             if p.name == player_name:
                 return get_sum(p.hand) <=7
-
-
+    def get_score(self, player_called_yaniv):
+        """
+        return value = {
+            game_leader:string(player_name),
+            how_called_yeniv = string(player_name),
+            round_winner = string(player name)
+            players_names = [list of names]
+            players_score : [list of players score],
+            players_totle_score: [list of players totle score],
+            is_game_over : boolean(if one of the players has 150 points),
+            players_hands: [list of players hands]
+        }
+        """
+        retVal = {'how_called' : player_called_yaniv}
+        players_score = []
+        players_totle_score =[]
+        game_leader = ""
+        plyers_hands = []
+        is_game_over = False
+        round_winner = player_called_yaniv
+        best_score = get_sum(self.get_player(player_called_yaniv).hand)
+        #culcolating score and check for asaf
+        for p in self.players:
+            p.current_score = get_sum(p.hand)
+            plyers_hands.append(p.hand)
+            if p.current_score < best_score :
+                best_score = p.current_score
+                round_winner = p.name
+        if round_winner != player_called_yaniv:
+            self.get_player(player_called_yaniv).current_score +=30
+        #initial return value data
+        best_totle_score = 150
+        for p in self.players:
+            p.totle_score += p.current_score
+            if p.totle_score < best_totle_score:
+                game_leader = p.name
+                best_totle_score = p.totle_score
+            if p.totle_score >= 150:
+                is_game_over = True
+            players_score.append(p.current_score)
+            players_totle_score.append(p.totle_score)
+        retVal['players_score'] = players_score
+        retVal['players_totle_score'] = players_totle_score
+        retVal['plyers_hands'] = plyers_hands
+        retVal['game_leader'] = game_leader
+        retVal['is_game_over'] = is_game_over
+        retVal['players_names'] = self.get_players_names()
+        retVal['round_winner'] = round_winner
+        return retVal

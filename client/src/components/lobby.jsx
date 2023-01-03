@@ -67,7 +67,7 @@ class Lobby extends Component {
                 <h3>{"Welcome  "+userName}</h3>
                 <div>
                     <button className='btn btn-primary lr' onClick={this.createNewGame.bind(this)}>Create New Game</button>
-                    <button className='btn btn-primary m-2 lr' hidden={true}>Play against the computer</button>
+                    <button className='btn btn-primary m-2 lr' >Play against the computer</button>
                 </div>
                 <style>{`
                     table, th, td{

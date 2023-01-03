@@ -170,3 +170,22 @@
   border-color: rgb(136, 131, 131);
   border-width: 5px;
 }
+.ready{
+  font-style: italic;
+  font-size: large;
+  border-color: chartreuse;
+  border-radius: 5px;
+  border-style: ridge;
+  padding: 5px;
+  color: chartreuse;
+}
+.not-ready{
+  font-style: italic;
+  font-size: large;
+  border-color: red;
+  border-radius: 5px;
+  border-style: ridge;
+  padding: 5px;
+  color: red;
+
+}

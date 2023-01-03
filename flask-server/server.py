@@ -3,12 +3,12 @@ import copy
 from game import Game
 from player import *
 import json
+import random
 from flask import *
 from flask_socketio import SocketIO,emit
 from flask_cors import CORS
 import mysql.connector
 """globals"""
-open_games_props = []
 open_games_ins = {}
 connected_users = {}
 num_of_open_games = 0
@@ -24,13 +24,14 @@ def update_oppenents(data):
     global open_games_ins
     game:Game = open_games_ins[data]
     opponents = game.get_players_names()
-    print("opponent_join(event call) : ",opponents)
-    for username in opponents:
-        emit('update_oppenents', {'opponents' : opponents}, room=connected_users[username])
-    if len(opponents) == 4:
-        player1 = opponents[0]
-        for p in game.players:
-            socketio.emit('reset_cards', {'cards' : p.hand, 'curr_player' : player1}, room=connected_users[p.name])
+    for user in game.players:
+        emit('update_oppenents', {'opponents' : opponents}, room=connected_users[user.name])      
+        if user.is_ready:
+            for p in game.players:
+                if p.name != user.name:
+                    socketio.emit('opponent_ready', {'opponent' : user.name}, room=connected_users[p.name])
+
+
 
 @app.route("/join_game", methods=['POST'])
 def join_game():
@@ -39,8 +40,6 @@ def join_game():
     game:Game = open_games_ins[data['gameId']]
     game.add_player(Player(data['username']))
     print("join_game(event call)",game.get_players_names())
-    if game.number_of_players == 4:
-        game.reset_game()
     #initial connection to database
     mydb = mysql.connector.connect(
         host = 'localhost',
@@ -61,7 +60,7 @@ def join_game():
     mydb.close()
     return {'id' : game.id}
 
-
+  
 
 @socketio.on("user_connect")
 def connected(username):
@@ -113,6 +112,27 @@ def opponent_leaveing():
     mydb.close()
     socketio.emit('update_games', games, broadcast=True)
 
+    return {}
+
+@app.route('/ready_to_start', methods=['POST'])
+def ready_to_start():
+    global connected_users, open_games_ins
+    data = json.loads(request.data)
+    game:Game = open_games_ins[data['gameId']]
+    all_ready = 0
+    for p in game.players:
+        if p.name == data['username']:
+            p.is_ready = True
+        else:
+            socketio.emit('opponent_ready', {'opponent' : data['username']}, room=connected_users[p.name])
+        if p.is_ready:
+            all_ready += 1
+    if all_ready == 4:
+
+        game.reset_ruond()
+        player_start = game.get_players_names()[random.randint(0,3)]
+        for p in game.players:
+            socketio.emit('reset_cards', {'cards' : p.hand, 'curr_player' : player_start}, room=connected_users[p.name])
     return {}
 
 
@@ -176,7 +196,7 @@ def login():
 
 @app.route("/create_game", methods=['POST'])
 def create_game():
-    global num_of_open_games, connected_users, open_games_props, open_games_ins
+    global num_of_open_games, connected_users, open_games_ins
     num_of_open_games += 1
     data = json.loads(request.data)
     player = Player(data['username'])
@@ -235,7 +255,15 @@ def reset_game():
     game.reset_game()
     return {}
 
-
+@app.route("/yaniv_called", methods=["POST"])
+def yaniv_called():
+    global open_games_ins
+    data = json.loads(request.data)
+    game:Game = open_games_ins[data['gameId']]
+    score = game.get_score(data['username'])
+    for p in game.get_players_names():
+        socketio.emit('yaniv', score, room=connected_users[p])
+    return {}
 
 @app.route("/get_card_deck",methods=["POST", "GET"])
 def get_card_deck():

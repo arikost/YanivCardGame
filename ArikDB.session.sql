@@ -1,1 +1,1 @@
-SELECT * from games;
+delete from games;

@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import "../App.css";
+import PopUp from './PopUp';
 import {socket} from "./lobby";
 
 class Game extends Component {
@@ -15,23 +16,43 @@ class Game extends Component {
                 player3 : "waiting for player to join",
                 player4 : "waiting for player to join",
             },
-            numberOfPlayers : 0,
+            player1Ready : false,
+            player2Ready : false,
+            player3Ready : false,
+            player4Ready : false,
             pile : [],
             myCards : [],
             selectsedCards : [],
             cardBtnStyle : {backgroundColor:'antiquewhite', borderWidth: 0},
             throwCardsPressed : true,
             isYaniv : true,
+            isYanivCalled : false,
+            score : {},
         }
     }
     componentDidMount(){
         socket.on("update_oppenents", (data) => {
             console.log('players', data);
-            this.setState({
-                numberOfPlayers : data.opponents.length
-            });
             this.reArangeOpponentsOrder(data.opponents);
         });
+        socket.on('opponent_ready', (data) =>{
+            console.log('opponent_ready', data);
+            if(data.opponent === this.state.opponents.player2){
+                this.setState({
+                    player2Ready : true
+                });
+            }
+            else if(data.opponent === this.state.opponents.player3){
+                this.setState({
+                    player3Ready : true
+                });
+            }
+            else if(data.opponent === this.state.opponents.player4){
+                this.setState({
+                    player4Ready : true
+                });
+            }
+        })
         socket.on('update_center', (data) =>{
             console.log('update_center', data);
             this.setState({
@@ -44,40 +65,60 @@ class Game extends Component {
             console.log("reset_cards", data);
             this.setState({
                 myCards : [...data.cards],
-                currentPlayer : data.curr_player
+                currentPlayer : data.curr_player,
+                pile : [],
+                selectsedCards : [],
+                lastThrown : []
             });
         });
+        socket.on('yaniv', (data) =>{
+            console.log('yaniv:', data);
+            this.setState({
+                isYanivCalled : true,
+                score : data,
+            });
+        })
         socket.emit('update_oppenents', this.state.gameId);
     }
     render() { 
         const {userName, 
             opponents, 
             myCards, 
-            numberOfPlayers, 
             currentPlayer, 
             lastThrown, 
             pile, 
             throwCardsPressed, 
-            isYaniv} = this.state;
-        if(numberOfPlayers < 4){
+            isYaniv,
+            isYanivCalled,
+            score,
+            player1Ready, 
+            player2Ready, 
+            player3Ready, 
+            player4Ready} = this.state;
+        if(!(player1Ready & player2Ready & player3Ready & player4Ready)){
             return (
                 <div className='background-game'>
                     <div className='player1'>
                         <h3>{userName}</h3>
                         <button className='btn btn-primary m-2 lr' onClick={this.props.onDelete}>Leave Game</button>
+                        <button className='btn btn-success m-2 lr'  onClick={this.readyToRestart.bind(this)}
+                        disabled={player1Ready}>Ready</button>
                     </div>
                     <div className='player2'>
                         <h4>{opponents.player2}</h4>
+                        <p className={this.getClassPlayerReady(player2Ready)} >Ready</p>
                     </div>
                     <div className='player3'>
                         <h4>{opponents.player3}</h4>
+                        <p className={this.getClassPlayerReady(player3Ready)} >Ready</p>
                     </div>
                     <div className='player4'>
                         <h4>{opponents.player4}</h4>
+                        <p className={this.getClassPlayerReady(player4Ready)} >Ready</p>
                     </div>
                 </div>
             );
-        }else{
+        }else{ 
             return(
                 <div className='background-game'>
                     <div className='player2' style={this.getClassPlayer(opponents.player2)}>
@@ -94,7 +135,7 @@ class Game extends Component {
                         {lastThrown.map((item, i) => 
                             <button className='btn btn-light m-1' key={i + 10} id={"pileCard"+i}  
                             style={this.state.cardBtnStyle} onClick={() => this.getCardFromTop(item)} 
-                            disabled={throwCardsPressed & (i !== 0 || i !== lastThrown.length)}>
+                            disabled={throwCardsPressed || (i !== 0 & i !== lastThrown.length-1)}>
                             <img  src={require('../images/'+item + '.png')} alt='' id={"lastThrowenCardImg"+i} width={90} height={120}></img>
                             </button>
                         )}
@@ -108,28 +149,72 @@ class Game extends Component {
                     <div className='playerHand' >
                         <div>
                             <button className='btn btn-primary m-2 lr' onClick={this.throwSelectedCards.bind(this)}
-                            disabled={currentPlayer !== userName}
+                            disabled={currentPlayer !== userName & throwCardsPressed}
                             >throw away selected cards</button>
                             <button className='btn btn-primary m-2 lr' onClick={this.resetSelectedCards.bind(this)}
-                            disabled={currentPlayer !== userName}
+                            disabled={currentPlayer !== userName & throwCardsPressed}
                             >reset selected cards</button>
-                            <button className='btn btn-sucess m-2 lr' hidden={isYaniv}>you can call Yaniv!!!</button>
+                            <button className='btn btn-success m-2 lr' 
+                            hidden={isYaniv} disabled={currentPlayer !== userName & throwCardsPressed} 
+                            onClick={this.yanivClickEvent.bind(this)} >you can call Yaniv!!!</button>
                         </div>
                         {myCards.map((item, i) => 
-                        <button className='btn btn-light m-1' key={i} id={"card"+i} onClick={() => this.cardSelcted(i)}>
+                        <button className='btn btn-light m-1' key={i} id={"card"+i} onClick={() => this.cardSelcted(i)}  
+                        disabled={currentPlayer !== userName & throwCardsPressed}>
                         <img key={100 + i} src={require('../images/'+item + '.png')} alt='' id={"cardImg"+i} width={150} height={200}></img>
                         </button>
                         )}        
                     </div>
+                    {isYanivCalled ?  <PopUp  id='pupupId' value={score} onClick={this.readyToRestart.bind(this)}></PopUp>: null}
                 </div>
             )
         }
+    }
+    readyToRestart(){
+        fetch('/ready_to_start',{
+            'method': 'POST',
+            headers : {
+              'Content-Type':'application/json'
+            },
+            body: JSON.stringify({
+              username : this.state.userName,
+              gameId : this.state.gameId,
+          })
+          }).then(
+            response => response.json()
+          ).catch(error => console.log(error)).then(
+            (response) => {
+                socket.emit('update_oppenents', this.state.gameId);
+                this.setState({
+                    player1Ready : true, 
+                    isYanivCalled: false,
+                })
+            }
+          )
+    }
+    yanivClickEvent(){
+        fetch('/yaniv_called',{
+            'method': 'POST',
+            headers : {
+              'Content-Type':'application/json'
+            },
+            body: JSON.stringify({
+              username : this.state.userName,
+              gameId : this.state.gameId,
+          })
+          }).catch(error => console.log(error))
     }
     getClassPlayer(player){
         if(player === this.state.currentPlayer){
             return {backgroundColor : 'LightCoral'};
         }
         return {backgroundColor: "lightblue"};
+    }
+    getClassPlayerReady(isReady){
+        if(isReady){
+            return "ready"
+        }
+        return 'not-ready'
     }
     throwSelectedCards(){
         //send to server to check if the move is legale
@@ -149,7 +234,11 @@ class Game extends Component {
           (response) => {
             if(response.legalety){
                 this.deleteItems(this.state.selectsedCards);
-                this.setState({throwCardsPressed : false})
+                this.resetSelectedCards();
+                this.setState({
+                    throwCardsPressed : false,
+
+                })
             }
           },
         )
@@ -161,18 +250,20 @@ class Game extends Component {
     resetSelectedCards(){
         this.setState({selectsedCards : []});
         for(var i=0; i< this.state.myCards.length; i++){
-          document.getElementById("cardImg"+i).width = 150;
-          document.getElementById("cardImg"+i).height = 200;
+          document.getElementById("cardImg"+i).style.width = 150;
+          document.getElementById("cardImg"+i).style.height = 200;
           document.getElementById("cardImg"+i).style.opacity = 1;
+          document.getElementById("card"+i).style.backgroundColor = '#f8f9fa';
         }
     }
     cardSelcted(i){
         if( !this.state.selectsedCards.includes(this.state.myCards[i])){
             this.state.selectsedCards.push(this.state.myCards[i]);
-            document.getElementById("card"+i).style.backgroundColor = '#A2BABD';
-            document.getElementById("cardImg"+i).width = 152;
-            document.getElementById("cardImg"+i).height = 204;
+            document.getElementById("cardImg"+i).style.width = 152;
+            document.getElementById("cardImg"+i).style.height = 204;
             document.getElementById("cardImg"+i).style.opacity = 0.5;
+            document.getElementById("card"+i).style.backgroundColor = '#F2D4D4';
+
         }
     }
     getCardFromDeck(){

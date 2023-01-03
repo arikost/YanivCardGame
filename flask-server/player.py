@@ -6,7 +6,7 @@ class Player:
         self.hand = []
         self.current_score = 0
         self.totle_score = 0
-    
+        self.is_ready = False
 def simulate(player_hand:list):
     decision = {'cards_to_throw' : [],
                 'pile_or_deck' : "",
@@ -222,6 +222,7 @@ def check_for_pairs(player_hand):
         return list(pair2)
 def sort_straghit(straghit:list):
     straghit.sort()
+    print(straghit)
     ms = find_missing_cards_for_straghit(straghit)
     print(ms)
     if len(ms) == 1:
@@ -229,6 +230,9 @@ def sort_straghit(straghit:list):
             temp = straghit[2]
             straghit[2] = straghit[0]
             straghit[0] = temp
+            temp = straghit[0]
+            straghit[0] = straghit[1]
+            straghit[1] = temp
         else:
             temp = straghit[1] 
             straghit[1] = straghit[0]

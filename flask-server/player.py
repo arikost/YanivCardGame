@@ -7,144 +7,144 @@ class Player:
         self.current_score = 0
         self.totle_score = 0
         self.is_ready = False
-def simulate(player_hand:list):
-    decision = {'cards_to_throw' : [],
-                'pile_or_deck' : "",
-                'yaniv' : False
-    }
-    sum_cards = 0
-    for card in player_hand:
-        card_prop = str(card).split('_')        
-        sum_cards += int(card_prop[0])
-    if sum_cards <= 7:
-        decision['yaniv'] = True
-        return decision 
-    player_hand.sort()
-    #check fo pairs
-    pair = check_for_pairs(player_hand)
-    #check for straight
-    straight = check_for_straghit(player_hand)
-    if len(straight) > 2:
-        straight.sort()
-        sort_straghit(straight)
-    print(player_hand)
-    completing_card_for_straghit = ""# a card that can complite a straghit and is draweble
-    completing_card_for_pair = ""# a card that can complite a pair and is draweble
-    missing_cards_for_straghit = [] #cards that can replace a joker in a strghit
-    if len(straight) != 0 and len(pair) != 0:
+    def simulate(self, last_cards_thrown:list):
+        decision = {'cards_to_throw' : [],
+                    'pile_or_deck' : "",
+                    'yaniv' : False
+        }
+        sum_cards = 0
+        for card in self.hand:
+            card_prop = str(card).split('_')        
+            sum_cards += int(card_prop[0])
+        if sum_cards <= 7:
+            decision['yaniv'] = True
+            return decision 
+        self.hand.sort()
+        #check fo pairs
+        pair = check_for_pairs(self.hand)
+        #check for straight
+        straight = check_for_straghit(self.hand)
+        if len(straight) > 2:
+            straight.sort()
+            sort_straghit(straight)
+        print(self.hand)
+        completing_card_for_straghit = ""# a card that can complite a straghit and is draweble
+        completing_card_for_pair = ""# a card that can complite a pair and is draweble
+        missing_cards_for_straghit = [] #cards that can replace a joker in a strghit
+        if len(straight) != 0 and len(pair) != 0:
+            
+            missing_cards_for_straghit = find_missing_cards_for_straghit(straight)
+            
+            if last_cards_thrown[0] in missing_cards_for_straghit:
+                completing_card_for_straghit = copy.copy(last_cards_thrown[0])
+            elif last_cards_thrown[-1] in missing_cards_for_straghit:
+                completing_card_for_straghit = copy.copy(last_cards_thrown[-1])
+            for card in self.hand:
+                if card[:2] == last_cards_thrown[0][:2]:
+                    completing_card_for_pair = last_cards_thrown[0]
+                if card[:2] == last_cards_thrown[-1][:2]:
+                    completing_card_for_pair = last_cards_thrown[-1]
         
-        missing_cards_for_straghit = find_missing_cards_for_straghit(straight)
-        
-        if last_cards_thrown[0] in missing_cards_for_straghit:
-            completing_card_for_straghit = copy.copy(last_cards_thrown[0])
-        elif last_cards_thrown[-1] in missing_cards_for_straghit:
-            completing_card_for_straghit = copy.copy(last_cards_thrown[-1])
-        for card in player_hand:
-            if card[:2] == last_cards_thrown[0][:2]:
-                completing_card_for_pair = last_cards_thrown[0]
-            if card[:2] == last_cards_thrown[-1][:2]:
-                completing_card_for_pair = last_cards_thrown[-1]
-    
-    if get_sum(pair) > 6 and completing_card_for_straghit != "":
-        print("in case get_sum(pair) > 6 and completing_card_for_straghit != """)
+        if get_sum(pair) > 6 and completing_card_for_straghit != "":
+            print("in case get_sum(pair) > 6 and completing_card_for_straghit != """)
 
-        decision['cards_to_throw'] = pair
-        decision['pile_or_deck'] = completing_card_for_straghit
-    elif get_sum(straight) > 6 and completing_card_for_pair != "":
-        decision['cards_to_throw'] = straight
-        decision['pile_or_deck'] = completing_card_for_pair
-    elif get_sum(straight) < get_sum(pair):
-        decision['cards_to_throw'] = pair
-        copy_hand = [card for card in player_hand if not card in pair]
-        copy_hand.append(last_cards_thrown[0])
-        copy_hand.sort()
-        opt1 = get_sum(check_for_pairs(copy_hand))
-        copy_hand.remove(last_cards_thrown[0])
-        copy_hand.append(last_cards_thrown[-1])
-        copy_hand.sort
-        opt2 = get_sum(check_for_pairs(copy_hand))
-        if  opt1 > opt2:
-            decision['pile_or_deck'] = last_cards_thrown[0]
-        elif opt1 < opt2:
-            decision['pile_or_deck'] = last_cards_thrown[-1]
-        elif opt2 == 0:
-            decision['pile_or_deck'] = 'deck'
-        else:
-            decision['pile_or_deck'] = last_cards_thrown[0]
-
-    elif get_sum(straight) > get_sum(pair):
-        print("in case get_sum(straight) > get_sum(pair)")
-
-        decision['cards_to_throw'] = straight
-        copy_hand = [card for card in player_hand if not card in straight]
-        copy_hand.append(last_cards_thrown[0])
-        copy_hand.sort()
-        opt1 = get_sum(check_for_pairs(copy_hand))
-        copy_hand.remove(last_cards_thrown[0])
-        copy_hand.append(last_cards_thrown[-1])
-        copy_hand.sort
-        opt2 = get_sum(check_for_pairs(copy_hand))
-        if  opt1 > opt2:
-            decision['pile_or_deck'] = last_cards_thrown[0]
-        elif opt1 < opt2:
-            decision['pile_or_deck'] = last_cards_thrown[-1]
-        elif opt2 == 0:
-            decision['pile_or_deck'] = 'deck'
-        else:
-            decision['pile_or_deck'] = last_cards_thrown[0]
-    
-    elif len(straight) == 0 and get_sum(pair) > 0:
-        print("in case len(straight) == 0 and get_sum(pair) > 4")
-        decision['cards_to_throw'] = pair
-        if int(last_cards_thrown[0][:2]) > 5:
-            decision['pile_or_deck'] = last_cards_thrown[0] 
-        elif int(last_cards_thrown[-1][:2]) > 5:
-            decision['pile_or_deck'] = last_cards_thrown[-1] 
-        else:
-            decision['pile_or_deck'] = 'deck'
-    elif get_sum(pair) == 0 and get_sum(straight) == 0:
-        print("in case no pair no straghit")
-        player_hand_copy = copy.copy(player_hand)
-        player_hand_copy.append(last_cards_thrown[0])
-        player_hand_copy.sort()
-        opt_for_pair1 = check_for_pairs(player_hand_copy)
-        opt_for_str1 = check_for_straghit(player_hand_copy)
-        
-        player_hand_copy.remove(last_cards_thrown[0])
-        options = [opt_for_pair1, opt_for_str1]
-        if len(last_cards_thrown) > 1:
-            player_hand_copy.append(last_cards_thrown[-1])
-            player_hand_copy.sort()
-       
-            opt_for_pair2 = check_for_pairs(player_hand_copy)
-            opt_for_str2 = check_for_straghit(player_hand_copy)
-            player_hand_copy.remove(last_cards_thrown[-1])
-            options.append( opt_for_pair2)
-            options.append( opt_for_str2)
-        final_opt = options[0]
-        max_sum = 0
-        for opt in options:
-            x = get_sum(opt)
-            if x > max_sum:
-                max_sum = x
-                final_opt = opt
-        if max_sum == 0:
-            decision['cards_to_throw'] = [player_hand[-1]]
-            if int(last_cards_thrown[0][:2]) < 2:
+            decision['cards_to_throw'] = pair
+            decision['pile_or_deck'] = completing_card_for_straghit
+        elif get_sum(straight) > 6 and completing_card_for_pair != "":
+            decision['cards_to_throw'] = straight
+            decision['pile_or_deck'] = completing_card_for_pair
+        elif get_sum(straight) < get_sum(pair):
+            decision['cards_to_throw'] = pair
+            copy_hand = [card for card in self.hand if not card in pair]
+            copy_hand.append(last_cards_thrown[0])
+            copy_hand.sort()
+            opt1 = get_sum(check_for_pairs(copy_hand))
+            copy_hand.remove(last_cards_thrown[0])
+            copy_hand.append(last_cards_thrown[-1])
+            copy_hand.sort
+            opt2 = get_sum(check_for_pairs(copy_hand))
+            if  opt1 > opt2:
                 decision['pile_or_deck'] = last_cards_thrown[0]
+            elif opt1 < opt2:
+                decision['pile_or_deck'] = last_cards_thrown[-1]
+            elif opt2 == 0:
+                decision['pile_or_deck'] = 'deck'
             else:
-                decision['pile_or_deck'] = "deck"
-        else:
-            for card in player_hand_copy:
-                if card in final_opt:
-                    final_opt.remove(card)
+                decision['pile_or_deck'] = last_cards_thrown[0]
+
+        elif get_sum(straight) > get_sum(pair):
+            print("in case get_sum(straight) > get_sum(pair)")
+
+            decision['cards_to_throw'] = straight
+            copy_hand = [card for card in self.hand if not card in straight]
+            copy_hand.append(last_cards_thrown[0])
+            copy_hand.sort()
+            opt1 = get_sum(check_for_pairs(copy_hand))
+            copy_hand.remove(last_cards_thrown[0])
+            copy_hand.append(last_cards_thrown[-1])
+            copy_hand.sort
+            opt2 = get_sum(check_for_pairs(copy_hand))
+            if  opt1 > opt2:
+                decision['pile_or_deck'] = last_cards_thrown[0]
+            elif opt1 < opt2:
+                decision['pile_or_deck'] = last_cards_thrown[-1]
+            elif opt2 == 0:
+                decision['pile_or_deck'] = 'deck'
+            else:
+                decision['pile_or_deck'] = last_cards_thrown[0]
+        
+        elif len(straight) == 0 and get_sum(pair) > 0:
+            print("in case len(straight) == 0 and get_sum(pair) > 4")
+            decision['cards_to_throw'] = pair
+            if int(last_cards_thrown[0][:2]) > 5:
+                decision['pile_or_deck'] = last_cards_thrown[0] 
+            elif int(last_cards_thrown[-1][:2]) > 5:
+                decision['pile_or_deck'] = last_cards_thrown[-1] 
+            else:
+                decision['pile_or_deck'] = 'deck'
+        elif get_sum(pair) == 0 and get_sum(straight) == 0:
+            print("in case no pair no straghit")
+            player_hand_copy = copy.copy(self.hand)
+            player_hand_copy.append(last_cards_thrown[0])
+            player_hand_copy.sort()
+            opt_for_pair1 = check_for_pairs(player_hand_copy)
+            opt_for_str1 = check_for_straghit(player_hand_copy)
+            
+            player_hand_copy.remove(last_cards_thrown[0])
+            options = [opt_for_pair1, opt_for_str1]
+            if len(last_cards_thrown) > 1:
+                player_hand_copy.append(last_cards_thrown[-1])
+                player_hand_copy.sort()
+        
+                opt_for_pair2 = check_for_pairs(player_hand_copy)
+                opt_for_str2 = check_for_straghit(player_hand_copy)
+                player_hand_copy.remove(last_cards_thrown[-1])
+                options.append( opt_for_pair2)
+                options.append( opt_for_str2)
+            final_opt = options[0]
+            max_sum = 0
+            for opt in options:
+                x = get_sum(opt)
+                if x > max_sum:
+                    max_sum = x
+                    final_opt = opt
+            if max_sum == 0:
+                decision['cards_to_throw'] = [self.hand[-1]]
+                if int(last_cards_thrown[0][:2]) < 2:
+                    decision['pile_or_deck'] = last_cards_thrown[0]
                 else:
-                    decision['cards_to_throw'] = [card]
-            
-            
-            decision['pile_or_deck'] = final_opt.pop()
-    
-    return decision
+                    decision['pile_or_deck'] = "deck"
+            else:
+                for card in player_hand_copy:
+                    if card in final_opt:
+                        final_opt.remove(card)
+                    else:
+                        decision['cards_to_throw'] = [card]
+                
+                
+                decision['pile_or_deck'] = final_opt.pop()
+        
+        return decision
 
 
 
